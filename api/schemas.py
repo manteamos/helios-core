@@ -4,7 +4,7 @@ Pydantic v2 request and response schemas for the simulation API.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -73,3 +73,80 @@ class SimulationStatus(BaseModel):
     status: Literal["pending", "started", "success", "failure"]
     result: SimulationResult | None = None
     error: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Component catalogue schemas (UI dropdowns)
+# ---------------------------------------------------------------------------
+
+
+class ModuleInfo(BaseModel):
+    """Lightweight module descriptor for the UI component selector."""
+
+    id: str
+    manufacturer: str
+    model_name: str
+    p_stc_w: float
+    width_m: float
+    length_m: float
+    temp_coeff_p_pct_k: float
+    eta_ref: float = Field(description="STC efficiency derived from P_stc / (1000 × area)")
+
+
+class InverterInfo(BaseModel):
+    """Inverter descriptor for the UI component selector."""
+
+    id: str
+    manufacturer: str
+    model_name: str
+    p_ac_max_kw: float
+    p_dc_max_kw: float
+    eta_max: float
+    mppt_count: int
+    v_dc_max_v: float
+
+
+# ---------------------------------------------------------------------------
+# Panel layout schemas
+# ---------------------------------------------------------------------------
+
+
+class PanelPosition(BaseModel):
+    """Four WGS84 corners of a single panel rectangle, counter-clockwise from SW."""
+
+    corners: list[tuple[float, float]]
+
+
+class PanelLayoutRequest(BaseModel):
+    """Request body for POST /api/v1/layout/panels."""
+
+    roof_polygon: list[tuple[float, float]] = Field(
+        description="Roof outline as [[lat, lon], …] — minimum 3 vertices"
+    )
+    module_id: str = Field(description="itl_identifier of the module from /components/modules")
+    setback_m: float = Field(default=0.5, ge=0.0, le=5.0, description="Edge setback [m]")
+    row_gap_m: float = Field(default=0.05, ge=0.0, le=2.0, description="Gap between rows [m]")
+    col_gap_m: float = Field(default=0.02, ge=0.0, le=1.0, description="Gap between columns [m]")
+    orientation: Literal["portrait", "landscape"] = "portrait"
+
+
+class PanelLayoutResponse(BaseModel):
+    """Response from POST /api/v1/layout/panels."""
+
+    panel_count: int
+    panels: list[PanelPosition]
+    roof_area_m2: float
+    usable_area_m2: float
+    installed_kw: float
+    centroid: tuple[float, float] = Field(description="[lat, lon] centroid of the roof polygon")
+
+
+# ---------------------------------------------------------------------------
+# Synchronous simulation (used by UI without Celery)
+# ---------------------------------------------------------------------------
+
+
+class SyncSimulationRequest(SimulationRequest):
+    """Identical to SimulationRequest; used by the /run-sync endpoint."""
+
+    extra_meta: dict[str, Any] | None = None
