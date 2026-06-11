@@ -452,52 +452,89 @@ function setupMap() {
 // ═══════════════════════════════════════════════════════
 function setupAutocomplete() {
   const input = document.getElementById('search-input');
-  const ac = new google.maps.places.Autocomplete(input, {
-    fields: ['geometry', 'name', 'formatted_address'],
+
+  // Places Autocomplete (requires Places API enabled; silently skipped if not)
+  try {
+    const ac = new google.maps.places.Autocomplete(input, {
+      fields: ['geometry', 'name', 'formatted_address'],
+    });
+    ac.addListener('place_changed', () => {
+      const place = ac.getPlace();
+      // place_changed fires on Enter even when no suggestion is selected —
+      // fall through to geocodeManual() when geometry is absent
+      if (place.geometry && place.geometry.location) {
+        flyToPlace(place.geometry, place.formatted_address || place.name);
+      } else {
+        geocodeManual();
+      }
+    });
+  } catch (e) {
+    console.warn('Places Autocomplete unavailable:', e);
+  }
+
+  // Enter key always triggers a search (fixes silent no-op from previous behaviour)
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); geocodeManual(); }
   });
-  ac.addListener('place_changed', () => {
-    const place = ac.getPlace();
-    if (!place.geometry || !place.geometry.location) return;
-    if (place.geometry.viewport) {
-      gmap.fitBounds(place.geometry.viewport);
-    } else {
-      gmap.setCenter(place.geometry.location);
-      gmap.setZoom(19);
-    }
-    // Drop a pin at the searched location
-    if (coordMarker) coordMarker.setMap(null);
-    coordMarker = new google.maps.Marker({ position: place.geometry.location, map: gmap });
-    coordInfoWindow.setContent(
-      `<div style="color:#00d4ff;font-family:monospace;font-size:12px;background:#1a1a2e;padding:2px 4px">` +
-      `&#128205; ${place.formatted_address || place.name}</div>`
-    );
-    coordInfoWindow.open(gmap, coordMarker);
-  });
-  // Prevent the form from submitting when the user presses Enter
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });
 }
 
-// Fallback: manual geocode via Places API when user presses "Go"
-function geocodeManual() {
+// Shared helper: pan/zoom to a geocoded geometry and drop a pin
+function flyToPlace(geometry, label) {
+  const loc = typeof geometry.location === 'function' ? geometry.location : geometry.location;
+  if (geometry.viewport) gmap.fitBounds(geometry.viewport);
+  else { gmap.setCenter(loc); gmap.setZoom(19); }
+  if (coordMarker) coordMarker.setMap(null);
+  coordMarker = new google.maps.Marker({ position: loc, map: gmap });
+  coordInfoWindow.setContent(
+    `<div style="color:#00d4ff;font-family:monospace;font-size:12px;background:#1a1a2e;padding:2px 4px">` +
+    `&#128205; ${label}</div>`
+  );
+  coordInfoWindow.open(gmap, coordMarker);
+}
+
+// Search: try Google Geocoder first, fall back to Nominatim (no API key needed)
+async function geocodeManual() {
   const q = document.getElementById('search-input').value.trim();
-  if (!q || !gmap) return;
-  const geocoder = new google.maps.Geocoder();
-  geocoder.geocode({ address: q }, (results, status) => {
-    if (status === 'OK' && results.length > 0) {
-      const loc = results[0].geometry.location;
-      if (results[0].geometry.viewport) gmap.fitBounds(results[0].geometry.viewport);
-      else { gmap.setCenter(loc); gmap.setZoom(19); }
+  if (!q) return;
+
+  // Google Geocoder (works when Maps JS API + Geocoding API are enabled)
+  if (gmap && window.google && google.maps.Geocoder) {
+    try {
+      const hit = await new Promise((resolve, reject) => {
+        new google.maps.Geocoder().geocode({ address: q }, (results, status) => {
+          status === 'OK' && results.length > 0 ? resolve(results[0]) : reject(status);
+        });
+      });
+      flyToPlace(hit.geometry, hit.formatted_address);
+      return;
+    } catch (_) {
+      // Geocoding API not enabled or quota exceeded — fall through to Nominatim
+    }
+  }
+
+  // Nominatim fallback — free, no key required
+  try {
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
+      { headers: { 'Accept-Language': 'en', 'User-Agent': 'helios-core-siteplanner/1.0' } }
+    );
+    const data = await resp.json();
+    if (!data.length) { alert('Location not found. Try a more specific address.'); return; }
+    const lat = parseFloat(data[0].lat);
+    const lng = parseFloat(data[0].lon);
+    if (gmap) {
+      const loc = new google.maps.LatLng(lat, lng);
+      gmap.setCenter(loc);
+      gmap.setZoom(19);
       if (coordMarker) coordMarker.setMap(null);
       coordMarker = new google.maps.Marker({ position: loc, map: gmap });
       coordInfoWindow.setContent(
         `<div style="color:#00d4ff;font-family:monospace;font-size:12px;background:#1a1a2e;padding:2px 4px">` +
-        `&#128205; ${results[0].formatted_address}</div>`
+        `&#128205; ${data[0].display_name}</div>`
       );
       coordInfoWindow.open(gmap, coordMarker);
-    } else {
-      alert('Location not found. Try a more specific address.');
     }
-  });
+  } catch (e) { alert('Search error: ' + e.message); }
 }
 
 // ═══════════════════════════════════════════════════════
