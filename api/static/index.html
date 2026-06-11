@@ -109,6 +109,17 @@
     .gm-ctrl-btn:hover { background: rgba(13,59,102,0.95); }
     .gm-ctrl-btn.active { background: rgba(0,212,255,0.18); border-color: #00d4ff; }
 
+    /* Measure distance overlay */
+    #measure-box {
+      position: absolute; bottom: 42px; left: 10px; z-index: 1001;
+      background: rgba(26,26,46,0.88); color: #ff6b35; padding: 5px 10px;
+      border-radius: 4px; font-size: 11px; font-family: monospace;
+      border: 1px solid rgba(255,107,53,0.4); backdrop-filter: blur(4px);
+      pointer-events: none; white-space: nowrap; line-height: 1.5;
+    }
+    #measure-box .ml { font-size: 9px; color: #6060a0; display: block; margin-bottom: 1px; }
+    #measure-box .mh { font-size: 10px; color: #6060a0; margin-top: 2px; display: block; }
+
     /* Google Places Autocomplete dropdown theming */
     .pac-container {
       background: #1a1a2e !important; border: 1px solid #2a2a50 !important;
@@ -263,6 +274,11 @@
 <!-- ══════════════ MAP ══════════════ -->
 <div id="map">
   <div id="gmap"></div>
+  <div id="measure-box" class="hidden">
+    <span class="ml">Measurement</span>
+    <span id="measure-val">—</span>
+    <span class="mh" id="measure-hint">Click to add points · double-click to finish · Esc to cancel</span>
+  </div>
   <div id="coord-box">
     <span class="coord-label">Coordinates (WGS84)</span>
     <span id="coord-val" style="letter-spacing:0.3px">Move cursor over map</span>
@@ -292,6 +308,13 @@ let catModOffset     = 0;
 let catInvOffset     = 0;
 const CAT_PAGE       = 20;
 
+// Measurement tool state
+let measureMode      = false;
+let measurePoints    = [];
+let measurePolyline  = null;
+let measureDotMarkers = [];
+let measureClickTimer = null;
+
 // ═══════════════════════════════════════════════════════
 //  Boot sequence: fetch key → inject Maps script → init
 // ═══════════════════════════════════════════════════════
@@ -309,18 +332,23 @@ async function initApp() {
     return;
   }
 
-  await new Promise((resolve, reject) => {
-    window.__gmInit = resolve;
-    const s = document.createElement('script');
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=drawing,places&callback=__gmInit&loading=async`;
-    s.async = true;
-    s.onerror = () => reject(new Error('Google Maps failed to load'));
-    document.head.appendChild(s);
-  });
-
-  setupMap();
-  setupAutocomplete();
-  loadSeeds();
+  try {
+    await new Promise((resolve, reject) => {
+      window.__gmInit = resolve;
+      const s = document.createElement('script');
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=drawing,places,geometry&callback=__gmInit&loading=async`;
+      s.async = true;
+      s.onerror = () => reject(new Error('Google Maps failed to load'));
+      document.head.appendChild(s);
+    });
+    setupMap();
+    setupAutocomplete();
+  } catch (e) {
+    console.error('Google Maps load error:', e);
+    document.getElementById('gmap').innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ff6b35;font-size:13px;background:#0f0f23">' +
+      'Google Maps failed to load. Check the API key and enabled APIs.</div>';
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -445,6 +473,32 @@ function setupMap() {
   clearBtn.title = 'Remove roof outline and panel layout';
   clearBtn.onclick = clearAll;
   gmap.controls[G.ControlPosition.TOP_LEFT].push(clearBtn);
+
+  // ── Custom control: Measure distance/area ───────────
+  const measureBtn = document.createElement('button');
+  measureBtn.id        = 'measure-btn';
+  measureBtn.className = 'gm-ctrl-btn';
+  measureBtn.textContent = '📏 Measure';
+  measureBtn.title = 'Click points to measure distance and area';
+  measureBtn.onclick = toggleMeasure;
+  gmap.controls[G.ControlPosition.TOP_LEFT].push(measureBtn);
+
+  // ── Map click → measurement points (debounced to avoid dblclick ghost) ──
+  gmap.addListener('click', e => {
+    if (!measureMode) return;
+    if (measureClickTimer) { clearTimeout(measureClickTimer); measureClickTimer = null; }
+    measureClickTimer = setTimeout(() => { addMeasurePoint(e.latLng); measureClickTimer = null; }, 220);
+  });
+
+  // ── Double-click → finish measurement ───────────────
+  gmap.addListener('dblclick', e => {
+    if (!measureMode) return;
+    if (measureClickTimer) { clearTimeout(measureClickTimer); measureClickTimer = null; }
+    finishMeasure();
+  });
+
+  // ── Escape key → cancel measurement ─────────────────
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && measureMode) finishMeasure(); });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -513,10 +567,10 @@ async function geocodeManual() {
   }
 
   // Nominatim fallback — free, no key required
+  // NOTE: browsers block setting User-Agent as a fetch header; omit it entirely
   try {
     const resp = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
-      { headers: { 'Accept-Language': 'en', 'User-Agent': 'helios-core-siteplanner/1.0' } }
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=en`
     );
     const data = await resp.json();
     if (!data.length) { alert('Location not found. Try a more specific address.'); return; }
@@ -561,6 +615,92 @@ function boundsToArray(bounds) {
 }
 
 // ═══════════════════════════════════════════════════════
+//  Measurement tool
+// ═══════════════════════════════════════════════════════
+function toggleMeasure() {
+  measureMode = !measureMode;
+  const btn = document.getElementById('measure-btn');
+  if (btn) { btn.classList.toggle('active', measureMode); btn.textContent = measureMode ? '✓ End Measure' : '📏 Measure'; }
+  if (!measureMode) {
+    clearMeasurement();
+    if (gmap) gmap.setOptions({ draggableCursor: null });
+    document.getElementById('measure-box').classList.add('hidden');
+  } else {
+    if (gmap) gmap.setOptions({ draggableCursor: 'crosshair' });
+    if (drawingMgr) drawingMgr.setDrawingMode(null);
+    document.getElementById('measure-box').classList.remove('hidden');
+    document.getElementById('measure-val').textContent = 'Click map to start…';
+    document.getElementById('measure-hint').textContent = 'Click to add points · double-click to finish · Esc to cancel';
+  }
+}
+
+function addMeasurePoint(latLng) {
+  measurePoints.push(latLng);
+
+  // Dot marker at clicked point
+  const dot = new google.maps.Marker({
+    position: latLng,
+    map: gmap,
+    icon: { path: google.maps.SymbolPath.CIRCLE, scale: 5, fillColor: '#ff6b35', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 },
+    clickable: false,
+    zIndex: 10,
+  });
+  measureDotMarkers.push(dot);
+
+  // Update or create the polyline
+  if (measurePolyline) {
+    measurePolyline.setPath(measurePoints);
+  } else {
+    measurePolyline = new google.maps.Polyline({
+      path: measurePoints, map: gmap, clickable: false,
+      strokeColor: '#ff6b35', strokeOpacity: 0.9, strokeWeight: 2.5,
+    });
+  }
+
+  updateMeasureDisplay();
+}
+
+function updateMeasureDisplay() {
+  if (measurePoints.length < 2) return;
+
+  // Sum segment distances
+  let totalM = 0;
+  for (let i = 1; i < measurePoints.length; i++) {
+    totalM += google.maps.geometry.spherical.computeDistanceBetween(measurePoints[i - 1], measurePoints[i]);
+  }
+  const distStr = totalM < 1000 ? `${totalM.toFixed(1)} m` : `${(totalM / 1000).toFixed(3)} km`;
+
+  // Area if 3+ points
+  let areaStr = '';
+  if (measurePoints.length >= 3) {
+    const areaM2 = Math.abs(google.maps.geometry.spherical.computeArea(measurePoints));
+    areaStr = areaM2 >= 10000
+      ? `  ·  Area ${(areaM2 / 10000).toFixed(2)} ha`
+      : `  ·  Area ${areaM2.toFixed(1)} m²`;
+  }
+
+  document.getElementById('measure-val').textContent = `Distance ${distStr}${areaStr}`;
+  document.getElementById('measure-hint').textContent =
+    `${measurePoints.length} point${measurePoints.length > 1 ? 's' : ''} · double-click to finish · Esc to cancel`;
+}
+
+function finishMeasure() {
+  measureMode = false;
+  const btn = document.getElementById('measure-btn');
+  if (btn) { btn.classList.remove('active'); btn.textContent = '📏 Measure'; }
+  if (gmap) gmap.setOptions({ draggableCursor: null });
+  // Leave the polyline + dots visible so the user can read the result
+  document.getElementById('measure-hint').textContent = 'Click 📏 Measure to start a new measurement';
+}
+
+function clearMeasurement() {
+  measurePoints = [];
+  if (measurePolyline) { measurePolyline.setMap(null); measurePolyline = null; }
+  measureDotMarkers.forEach(m => m.setMap(null));
+  measureDotMarkers = [];
+}
+
+// ═══════════════════════════════════════════════════════
 //  Roof / panel management
 // ═══════════════════════════════════════════════════════
 function clearRoof() {
@@ -571,6 +711,9 @@ function clearRoof() {
 function clearAll() {
   clearRoof();
   currentPoly = null;
+  clearMeasurement();
+  document.getElementById('measure-box').classList.add('hidden');
+  if (measureMode) { measureMode = false; const b = document.getElementById('measure-btn'); if (b) { b.classList.remove('active'); b.textContent = '📏 Measure'; } }
   document.getElementById('layout-results').classList.add('hidden');
   document.getElementById('sim-results').classList.add('hidden');
 }
@@ -674,6 +817,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (v === '__catalog__') { switchTab('catalog'); return; }
     updateInvMeta();
   });
+  // loadSeeds() is independent of Google Maps — call it immediately so the
+  // module/inverter dropdowns populate even if Maps takes time or fails.
+  loadSeeds();
   initApp();
 });
 
