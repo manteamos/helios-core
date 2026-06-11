@@ -4,478 +4,457 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Helios Core — Site Planner</title>
-
-  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <!-- Leaflet.draw -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
-
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; display: flex; height: 100vh; overflow: hidden; background: #0f0f23; color: #e0e0e0; }
 
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      display: flex;
-      height: 100vh;
-      overflow: hidden;
-      background: #0f0f23;
-      color: #e0e0e0;
-    }
+    /* ── Sidebar ── */
+    #sidebar { width: 350px; min-width: 350px; display: flex; flex-direction: column; background: #1a1a2e; border-right: 1px solid #2a2a50; overflow: hidden; }
 
-    /* ── Sidebar ─────────────────────────────────────────── */
-    #sidebar {
-      width: 340px;
-      min-width: 340px;
-      display: flex;
-      flex-direction: column;
-      background: #1a1a2e;
-      border-right: 1px solid #2a2a50;
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: #2a2a50 transparent;
-    }
+    .sidebar-header { padding: 14px 16px; background: linear-gradient(135deg,#0d3b66,#1a1a2e); border-bottom: 1px solid #2a2a50; flex-shrink: 0; }
+    .sidebar-header h1 { font-size: 16px; color: #00d4ff; letter-spacing: 0.5px; }
+    .sidebar-header p  { font-size: 10px; color: #6060a0; margin-top: 2px; }
 
-    .sidebar-header {
-      padding: 18px 16px 14px;
-      background: linear-gradient(135deg, #0d3b66 0%, #1a1a2e 100%);
-      border-bottom: 1px solid #2a2a50;
-    }
-    .sidebar-header h1 { font-size: 17px; color: #00d4ff; letter-spacing: 0.5px; }
-    .sidebar-header p  { font-size: 11px; color: #7070a0; margin-top: 3px; }
+    /* Tab bar */
+    .tab-bar { display: flex; border-bottom: 1px solid #2a2a50; flex-shrink: 0; }
+    .tab-btn { flex: 1; padding: 9px 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; background: none; border: none; color: #6060a0; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .tab-btn.active { color: #00d4ff; border-bottom-color: #00d4ff; background: #00d4ff0a; }
+    .tab-btn:hover:not(.active) { color: #a0a0d0; background: #ffffff08; }
 
-    .section {
-      padding: 13px 16px;
-      border-bottom: 1px solid #2a2a50;
-    }
+    /* Tab panels */
+    .tab-panel { display: none; flex: 1; overflow-y: auto; flex-direction: column; scrollbar-width: thin; scrollbar-color: #2a2a50 transparent; }
+    .tab-panel.active { display: flex; flex-direction: column; }
 
-    label {
-      display: block;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: #7070a0;
-      margin-bottom: 5px;
-    }
+    .section { padding: 12px 14px; border-bottom: 1px solid #2a2a50; flex-shrink: 0; }
 
-    input[type=text],
-    input[type=number],
-    select {
-      width: 100%;
-      padding: 7px 10px;
-      background: #0f0f23;
-      border: 1px solid #2a2a50;
-      color: #e0e0e0;
-      border-radius: 5px;
-      font-size: 13px;
-      transition: border-color 0.15s;
-    }
-    input:focus, select:focus {
-      outline: none;
-      border-color: #00d4ff;
-    }
+    label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.7px; color: #6060a0; margin-bottom: 4px; }
 
-    .search-row { display: flex; gap: 6px; }
-    .search-row input { flex: 1; }
-
-    .btn {
-      padding: 7px 13px;
-      background: #0d3b66;
-      color: #00d4ff;
-      border: 1px solid #00d4ff44;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 12px;
-      white-space: nowrap;
-      transition: background 0.15s;
+    input[type=text], input[type=number], select {
+      width: 100%; padding: 7px 9px; background: #0f0f23; border: 1px solid #2a2a50;
+      color: #e0e0e0; border-radius: 4px; font-size: 12px; transition: border-color 0.15s;
     }
+    input:focus, select:focus { outline: none; border-color: #00d4ff; }
+
+    .row2 { display: flex; gap: 8px; }
+    .row2 > * { flex: 1; }
+
+    .btn { padding: 6px 12px; background: #0d3b66; color: #00d4ff; border: 1px solid #00d4ff33; border-radius: 4px; cursor: pointer; font-size: 11px; transition: background 0.15s; white-space: nowrap; }
     .btn:hover { background: #155a99; }
+    .btn-full { width: 100%; padding: 9px; font-size: 13px; font-weight: 600; background: linear-gradient(135deg,#ff6b35,#e05522); color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-top: 8px; transition: opacity 0.15s; }
+    .btn-full:hover { opacity: 0.87; }
+    .btn-full:disabled { background: #2a2a3a; color: #555; cursor: not-allowed; opacity: 1; }
 
-    .btn-run {
-      width: 100%;
-      padding: 10px;
-      background: linear-gradient(135deg, #ff6b35, #e05522);
-      color: #fff;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 600;
-      margin-top: 10px;
-      transition: opacity 0.15s;
-    }
-    .btn-run:hover { opacity: 0.88; }
-    .btn-run:disabled { background: #333; color: #666; cursor: not-allowed; opacity: 1; }
+    .meta-text { font-size: 11px; color: #6060a0; margin-top: 4px; line-height: 1.5; }
+    .chips { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 5px; }
+    .chip { padding: 2px 7px; border-radius: 10px; font-size: 10px; font-weight: 600; background: #00d4ff12; color: #00d4ff; border: 1px solid #00d4ff30; }
+    .chip.green { background: #4caf5012; color: #4caf50; border-color: #4caf5030; }
 
-    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
-    .chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
-    .chip {
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 10px;
-      font-weight: 600;
-      background: #0d3b6644;
-      color: #00d4ff;
-      border: 1px solid #00d4ff33;
-    }
-
-    .module-meta { font-size: 11px; color: #7070a0; margin-top: 5px; line-height: 1.6; }
-
-    .instruction {
-      font-size: 12px;
-      color: #7070a0;
-      line-height: 1.6;
-      padding: 10px 12px;
-      background: #0f0f23;
-      border-left: 3px solid #00d4ff55;
-      border-radius: 0 4px 4px 0;
-    }
+    .instruction { font-size: 11px; color: #6060a0; line-height: 1.6; padding: 9px 11px; background: #0f0f23; border-left: 3px solid #00d4ff40; border-radius: 0 4px 4px 0; }
     .instruction strong { color: #00d4ff; }
 
-    .results-grid {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 5px 12px;
-      font-size: 13px;
-    }
-    .results-grid .val {
-      text-align: right;
-      color: #00d4ff;
-      font-weight: 600;
-    }
-    .results-grid .label-cell { color: #a0a0c0; }
+    .kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 12px; }
+    .kv .k { color: #8080b0; }
+    .kv .v { text-align: right; color: #00d4ff; font-weight: 600; }
+    .kv .div { height: 1px; background: #2a2a50; grid-column: 1/-1; margin: 3px 0; }
 
-    .divider { height: 1px; background: #2a2a50; margin: 6px 0; grid-column: 1/-1; }
+    .big-num { font-size: 26px; font-weight: 700; color: #00d4ff; line-height: 1; }
+    .big-label { font-size: 11px; color: #6060a0; margin-left: 6px; }
 
-    .status-dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      margin-right: 6px;
-    }
-    .dot-ok   { background: #4caf50; box-shadow: 0 0 5px #4caf5088; }
-    .dot-warn { background: #ffb74d; box-shadow: 0 0 5px #ffb74d88; }
-    .dot-err  { background: #ef5350; box-shadow: 0 0 5px #ef535088; }
-    .dot-idle { background: #555; }
+    /* Catalog */
+    .cat-search-row { display: flex; gap: 6px; margin-bottom: 8px; }
+    .cat-search-row input { flex: 1; }
+    .cat-list { max-height: 340px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #2a2a50 transparent; }
+    .cat-item { padding: 9px 10px; border-bottom: 1px solid #1e1e3a; cursor: pointer; transition: background 0.1s; }
+    .cat-item:hover { background: #00d4ff0d; }
+    .cat-item.selected { background: #00d4ff18; border-left: 3px solid #00d4ff; }
+    .cat-item .ci-name { font-size: 12px; color: #e0e0e0; font-weight: 500; line-height: 1.3; }
+    .cat-item .ci-meta { font-size: 10px; color: #6060a0; margin-top: 2px; }
+    .cat-item .ci-badge { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 9px; font-weight: 700; background: #00d4ff18; color: #00d4ff; margin-right: 4px; }
+    .cat-footer { padding: 6px 10px; font-size: 10px; color: #4040608; text-align: center; }
+    .cat-empty { padding: 20px; text-align: center; color: #4040a0; font-size: 12px; }
 
-    .panel-count-badge {
-      display: inline-block;
-      padding: 3px 10px;
-      background: #00d4ff1a;
-      color: #00d4ff;
-      border: 1px solid #00d4ff33;
-      border-radius: 12px;
-      font-size: 22px;
-      font-weight: 700;
-      margin: 4px 0;
-    }
+    .load-more { width: 100%; padding: 7px; background: none; border: 1px solid #2a2a50; color: #6060a0; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; transition: all 0.15s; }
+    .load-more:hover { border-color: #00d4ff; color: #00d4ff; }
+
+    .ver-tag { font-size: 10px; color: #4040a0; margin-top: 8px; text-align: right; }
+
+    .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid #00d4ff30; border-top-color: #00d4ff; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 5px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     .hidden { display: none !important; }
 
-    /* ── Map ──────────────────────────────────────────────── */
+    /* ── Map ── */
     #map { flex: 1; position: relative; }
 
-    /* Override Leaflet draw toolbar colours */
-    .leaflet-draw-toolbar a { background-color: #1a1a2e !important; color: #00d4ff !important; border-color: #2a2a50 !important; }
-    .leaflet-draw-toolbar a:hover { background-color: #0d3b66 !important; }
-
-    /* Spinning loader */
-    .spinner {
-      display: inline-block;
-      width: 14px; height: 14px;
-      border: 2px solid #00d4ff44;
-      border-top-color: #00d4ff;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
+    /* Coordinate display */
+    #coord-box {
+      position: absolute; bottom: 28px; right: 10px; z-index: 900;
+      background: #1a1a2ecc; color: #00d4ff; padding: 5px 10px;
+      border-radius: 4px; font-size: 11px; font-family: monospace;
+      border: 1px solid #2a2a50; backdrop-filter: blur(4px);
+      pointer-events: none;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    #coord-box .coord-label { font-size: 9px; color: #6060a0; display: block; margin-bottom: 1px; }
+    #coord-box .coord-val { letter-spacing: 0.3px; }
+
+    /* Click-pin popup style override */
+    .leaflet-popup-content-wrapper { background: #1a1a2e; color: #e0e0e0; border: 1px solid #2a2a50; border-radius: 6px; }
+    .leaflet-popup-tip { background: #1a1a2e; }
+    .leaflet-popup-content { font-size: 12px; font-family: monospace; color: #00d4ff; margin: 8px 12px; }
+
+    /* Draw toolbar dark theme */
+    .leaflet-draw-toolbar a { background-color: #1a1a2e !important; border-color: #2a2a50 !important; }
+    .leaflet-draw-toolbar a svg path { fill: #00d4ff !important; stroke: #00d4ff !important; }
   </style>
 </head>
-
 <body>
-<!-- ════════════════════════════════════════════════════════ SIDEBAR -->
-<div id="sidebar">
 
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<div id="sidebar">
   <div class="sidebar-header">
     <h1>☀ Helios Core</h1>
-    <p>Solar Site Planner — draw your roof, size your system</p>
+    <p>Solar Site Planner — measure roof · fit panels · simulate yield</p>
   </div>
 
-  <!-- SEARCH -->
-  <div class="section">
-    <label>Search location</label>
-    <div class="search-row">
-      <input id="search-input" type="text" placeholder="e.g. Accra, Ghana"
-             onkeydown="if(event.key==='Enter') searchLocation()"/>
-      <button class="btn" onclick="searchLocation()">Go</button>
-    </div>
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('setup')">Setup</button>
+    <button class="tab-btn" onclick="switchTab('catalog')">Catalog</button>
   </div>
 
-  <!-- MODULE SELECTOR -->
-  <div class="section">
-    <label>Solar module</label>
-    <select id="module-select" onchange="onModuleChange()">
-      <option value="">Loading modules…</option>
-    </select>
-    <div id="module-meta" class="module-meta"></div>
-    <div id="module-chips" class="chip-row"></div>
-  </div>
+  <!-- ════ SETUP TAB ════ -->
+  <div id="tab-setup" class="tab-panel active">
 
-  <!-- INVERTER SELECTOR -->
-  <div class="section">
-    <label>Inverter</label>
-    <select id="inverter-select">
-      <option value="">Loading inverters…</option>
-    </select>
-  </div>
-
-  <!-- LAYOUT SETTINGS -->
-  <div class="section">
-    <label>Layout settings</label>
-    <div class="two-col">
-      <div>
-        <label>Setback (m)</label>
-        <input id="setback" type="number" value="0.5" step="0.1" min="0.1" max="3"
-               onchange="redrawIfPolygon()"/>
-      </div>
-      <div>
-        <label>Row gap (m)</label>
-        <input id="row-gap" type="number" value="0.05" step="0.01" min="0.01" max="2"
-               onchange="redrawIfPolygon()"/>
+    <!-- Location search -->
+    <div class="section">
+      <label>Search location</label>
+      <div class="row2">
+        <input id="search-input" type="text" placeholder="Address, city, or coordinates…"
+               onkeydown="if(event.key==='Enter') searchLocation()"/>
+        <button class="btn" onclick="searchLocation()">Go</button>
       </div>
     </div>
-    <div style="margin-top:8px">
-      <label>Panel orientation</label>
-      <select id="orientation" onchange="redrawIfPolygon()">
-        <option value="portrait">Portrait (length N–S)</option>
-        <option value="landscape">Landscape (length E–W)</option>
+
+    <!-- Module -->
+    <div class="section">
+      <label>Solar module <span id="mod-src-tag" style="font-size:9px;color:#4caf50;margin-left:4px"></span></label>
+      <select id="module-select" onchange="onSeedModuleChange()">
+        <option value="">Loading…</option>
       </select>
-    </div>
-  </div>
-
-  <!-- INSTRUCTION -->
-  <div class="section">
-    <div class="instruction">
-      <strong>How to use:</strong> zoom to your site using the search box above,
-      then click the <strong>polygon tool</strong> on the map to trace your roof outline.
-      Click each corner, double-click to close the shape.
-      The panel layout will appear automatically.
-    </div>
-  </div>
-
-  <!-- LAYOUT RESULTS (hidden until polygon drawn) -->
-  <div id="layout-results" class="section hidden">
-    <label>
-      <span id="layout-status-dot" class="status-dot dot-ok"></span>
-      Roof layout
-    </label>
-
-    <div style="margin: 6px 0 10px">
-      <div class="panel-count-badge" id="panel-count">0</div>
-      <span style="font-size:12px; color:#7070a0; margin-left:8px">panels fitted</span>
+      <div id="module-meta" class="meta-text"></div>
+      <div id="module-chips" class="chips"></div>
     </div>
 
-    <div class="results-grid">
-      <span class="label-cell">Roof area</span>
-      <span class="val" id="roof-area">—</span>
-
-      <span class="label-cell">Usable area</span>
-      <span class="val" id="usable-area">—</span>
-
-      <span class="label-cell">Installed capacity</span>
-      <span class="val" id="installed-kw">—</span>
-
-      <div class="divider"></div>
-
-      <span class="label-cell">Roof centroid</span>
-      <span class="val" id="centroid-coords" style="font-size:11px">—</span>
+    <!-- Inverter -->
+    <div class="section">
+      <label>Inverter <span id="inv-src-tag" style="font-size:9px;color:#4caf50;margin-left:4px"></span></label>
+      <select id="inverter-select">
+        <option value="">Loading…</option>
+      </select>
+      <div id="inv-meta" class="meta-text"></div>
     </div>
 
-    <button class="btn-run" id="run-btn" onclick="runSimulation()">
-      Run Annual Simulation
-    </button>
-  </div>
+    <!-- Layout settings -->
+    <div class="section">
+      <label>Layout settings</label>
+      <div class="row2">
+        <div>
+          <label>Setback (m)</label>
+          <input id="setback" type="number" value="0.5" step="0.1" min="0.1" max="3" onchange="redrawIfPolygon()"/>
+        </div>
+        <div>
+          <label>Row gap (m)</label>
+          <input id="row-gap" type="number" value="0.05" step="0.01" min="0" max="2" onchange="redrawIfPolygon()"/>
+        </div>
+      </div>
+      <div style="margin-top:7px">
+        <label>Panel orientation</label>
+        <select id="orientation" onchange="redrawIfPolygon()">
+          <option value="portrait">Portrait — length N–S</option>
+          <option value="landscape">Landscape — length E–W</option>
+        </select>
+      </div>
+    </div>
 
-  <!-- SIMULATION RESULTS (hidden until sim complete) -->
-  <div id="sim-results" class="section hidden">
-    <label>
-      <span class="status-dot dot-ok"></span>
-      Annual simulation results
-    </label>
-    <div class="results-grid" id="sim-grid"></div>
-  </div>
+    <!-- Instruction -->
+    <div class="section">
+      <div class="instruction">
+        <strong>1.</strong> Search your site above.<br>
+        <strong>2.</strong> Click the <strong>polygon tool</strong> on the map and trace the roof outline — double-click to close.<br>
+        <strong>3.</strong> Panel layout appears instantly. Click <em>Run Simulation</em> for annual yield.
+      </div>
+    </div>
 
+    <!-- Layout results -->
+    <div id="layout-results" class="section hidden">
+      <label>Roof layout</label>
+      <div style="margin:6px 0 10px">
+        <span class="big-num" id="panel-count">0</span>
+        <span class="big-label">panels fitted</span>
+      </div>
+      <div class="kv">
+        <span class="k">Roof area</span>      <span class="v" id="roof-area">—</span>
+        <span class="k">Usable area</span>    <span class="v" id="usable-area">—</span>
+        <span class="k">Installed</span>      <span class="v" id="installed-kw">—</span>
+        <div class="div"></div>
+        <span class="k">Centroid</span>       <span class="v" id="centroid-coords" style="font-size:10px">—</span>
+      </div>
+      <button class="btn-full" id="run-btn" onclick="runSimulation()">Run Annual Simulation</button>
+    </div>
+
+    <!-- Simulation results -->
+    <div id="sim-results" class="section hidden">
+      <label>Annual simulation results</label>
+      <div class="kv" id="sim-kv"></div>
+    </div>
+
+  </div><!-- /tab-setup -->
+
+  <!-- ════ CATALOG TAB ════ -->
+  <div id="tab-catalog" class="tab-panel">
+
+    <!-- Module catalog -->
+    <div class="section">
+      <label>Module catalog — 21 500+ entries (NREL CEC, auto-updates with pvlib)</label>
+      <div class="cat-search-row">
+        <input id="cat-mod-q" type="text" placeholder="Search manufacturer or model…"
+               oninput="debounce(searchCatModules, 300)()"/>
+      </div>
+      <div id="cat-mod-list" class="cat-list">
+        <div class="cat-empty">Type to search modules</div>
+      </div>
+      <button id="cat-mod-more" class="load-more hidden" onclick="loadMoreModules()">Load more</button>
+      <div id="cat-mod-ver" class="ver-tag"></div>
+    </div>
+
+    <!-- Inverter catalog -->
+    <div class="section">
+      <label>Inverter catalog — 3 200+ entries (NREL SAM, auto-updates with pvlib)</label>
+      <div class="cat-search-row">
+        <input id="cat-inv-q" type="text" placeholder="Search manufacturer or model…"
+               oninput="debounce(searchCatInverters, 300)()"/>
+      </div>
+      <div id="cat-inv-list" class="cat-list">
+        <div class="cat-empty">Type to search inverters</div>
+      </div>
+      <button id="cat-inv-more" class="load-more hidden" onclick="loadMoreInverters()">Load more</button>
+      <div id="cat-inv-ver" class="ver-tag"></div>
+    </div>
+
+  </div><!-- /tab-catalog -->
+</div><!-- /sidebar -->
+
+<!-- ══════════════ MAP ══════════════ -->
+<div id="map">
+  <div id="coord-box">
+    <span class="coord-label">Coordinates (WGS84)</span>
+    <span class="coord-val" id="coord-val">Move cursor over map</span>
+  </div>
 </div>
-<!-- ════════════════════════════════════════════════════════ MAP -->
-<div id="map"></div>
 
-<!-- ════════════════════════════════════════════════════════ SCRIPTS -->
+<!-- ══════════════ SCRIPTS ══════════════ -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-
 <script>
-// ── Map init ──────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  Map
+// ═══════════════════════════════════════════════════════
 const map = L.map('map', { zoomControl: true }).setView([5.55, -0.20], 17);
 
-// Esri World Imagery (satellite)
 L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  {
-    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, USGS, AEX, GeoEye, Aerogrid, IGN, IGP, UPR-EGP, GIS Community',
-    maxZoom: 22,
-    maxNativeZoom: 21,
-  }
+  { attribution: 'Tiles &copy; Esri', maxZoom: 22, maxNativeZoom: 21 }
 ).addTo(map);
 
-// Esri labels overlay (so street names are visible on satellite)
 L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-  { maxZoom: 22, maxNativeZoom: 21, opacity: 0.7 }
+  { maxZoom: 22, maxNativeZoom: 21, opacity: 0.65 }
 ).addTo(map);
 
-// ── Draw control ─────────────────────────────────────────────────────────
+// ── Draw control ────────────────────────────────────────
 const drawnItems = new L.FeatureGroup().addTo(map);
-
 const drawControl = new L.Control.Draw({
   edit: { featureGroup: drawnItems, remove: true },
   draw: {
-    polygon: {
-      allowIntersection: false,
-      shapeOptions: { color: '#ff6b35', fillColor: '#ff6b3522', weight: 2 },
-      showArea: true,
-      metric: true,
-    },
-    rectangle: {
-      shapeOptions: { color: '#ff6b35', fillColor: '#ff6b3522', weight: 2 },
-    },
-    polyline:     false,
-    circle:       false,
-    circlemarker: false,
-    marker:       false,
+    polygon:      { allowIntersection: false, shapeOptions: { color: '#ff6b35', fillColor: '#ff6b3520', weight: 2 }, showArea: true },
+    rectangle:    { shapeOptions: { color: '#ff6b35', fillColor: '#ff6b3520', weight: 2 } },
+    polyline:     false, circle: false, circlemarker: false, marker: false,
   },
 });
 map.addControl(drawControl);
 
-// ── State ────────────────────────────────────────────────────────────────
-let modules      = [];
-let inverters    = [];
-let panelLayers  = [];
-let currentPoly  = null;   // [[lat,lon], ...]
+// ── Coordinate pointer ────────────────────────────────
+map.on('mousemove', e => {
+  const lat = e.latlng.lat.toFixed(6);
+  const lon = e.latlng.lng.toFixed(6);
+  const ns  = lat >= 0 ? 'N' : 'S';
+  const ew  = lon >= 0 ? 'E' : 'W';
+  document.getElementById('coord-val').textContent =
+    `${Math.abs(lat)}° ${ns},  ${Math.abs(lon)}° ${ew}`;
+});
 
-// ── Load component catalogues ────────────────────────────────────────────
-async function loadComponents() {
+// Click-to-pin: shows coordinates on right-click to avoid clashing with draw tool
+let coordMarker = null;
+map.on('contextmenu', e => {
+  if (coordMarker) map.removeLayer(coordMarker);
+  const lat = e.latlng.lat.toFixed(6);
+  const lon = e.latlng.lng.toFixed(6);
+  coordMarker = L.marker(e.latlng)
+    .addTo(map)
+    .bindPopup(`📍 ${lat}, ${lon}`)
+    .openPopup();
+});
+
+// ═══════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════
+let seedModules   = [];
+let seedInverters = [];
+let selectedMod   = null;   // { id, p_stc_w, width_m, length_m, temp_coeff_p_pct_k, eta_ref, ... }
+let selectedInv   = null;   // { p_ac_max_kw, ... }
+let panelLayers   = [];
+let currentPoly   = null;
+
+// Catalog pagination state
+let catModOffset  = 0;
+let catInvOffset  = 0;
+const CAT_PAGE    = 20;
+
+// ═══════════════════════════════════════════════════════
+//  Tab switching
+// ═══════════════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    const tabs = ['setup', 'catalog'];
+    b.classList.toggle('active', tabs[i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Load seed components on boot
+// ═══════════════════════════════════════════════════════
+async function loadSeeds() {
   try {
     const [mRes, iRes] = await Promise.all([
       fetch('/api/v1/components/modules'),
       fetch('/api/v1/components/inverters'),
     ]);
-    modules   = await mRes.json();
-    inverters = await iRes.json();
+    seedModules   = await mRes.json();
+    seedInverters = await iRes.json();
 
     const mSel = document.getElementById('module-select');
-    mSel.innerHTML = modules.map(m =>
-      `<option value="${m.id}">${m.manufacturer} ${m.model_name} — ${m.p_stc_w}W</option>`
-    ).join('');
+    mSel.innerHTML =
+      seedModules.map(m =>
+        `<option value="${m.id}">${m.manufacturer} ${m.model_name} — ${m.p_stc_w}W</option>`
+      ).join('') + '<option value="__catalog__" style="color:#4caf50">▸ Browse full catalog (21 500+ modules)…</option>';
 
     const iSel = document.getElementById('inverter-select');
-    iSel.innerHTML = inverters.map(i =>
-      `<option value="${i.id}">${i.manufacturer} ${i.model_name} — ${i.p_ac_max_kw}kW</option>`
-    ).join('');
+    iSel.innerHTML =
+      seedInverters.map(i =>
+        `<option value="${i.id}">${i.manufacturer} ${i.model_name} — ${i.p_ac_max_kw}kW</option>`
+      ).join('') + '<option value="__catalog__" style="color:#4caf50">▸ Browse full catalog (3 200+ inverters)…</option>';
 
-    onModuleChange();
-  } catch (e) {
-    console.error('Failed to load components:', e);
+    onSeedModuleChange();
+    updateInvMeta();
+  } catch (e) { console.error('Seeds load failed:', e); }
+}
+
+function onSeedModuleChange() {
+  const id = document.getElementById('module-select').value;
+  if (id === '__catalog__') { switchTab('catalog'); return; }
+  const m = seedModules.find(x => x.id === id);
+  if (!m) return;
+  selectedMod = { ...m, model_name: m.model_name };
+  document.getElementById('mod-src-tag').textContent = '(seed)';
+  renderModMeta(m);
+  if (currentPoly) triggerLayout(currentPoly);
+}
+
+function renderModMeta(m) {
+  document.getElementById('module-meta').textContent =
+    `${m.width_m} m × ${m.length_m} m  ·  η ${(m.eta_ref*100).toFixed(1)}%  ·  γ ${m.temp_coeff_p_pct_k}%/K`;
+  document.getElementById('module-chips').innerHTML =
+    `<span class="chip">${m.p_stc_w} W</span>` +
+    `<span class="chip">${(m.width_m*m.length_m).toFixed(2)} m²</span>`;
+}
+
+function updateInvMeta() {
+  const id = document.getElementById('inverter-select').value;
+  if (id === '__catalog__') return;
+  const inv = seedInverters.find(x => x.id === id);
+  if (inv) {
+    selectedInv = inv;
+    document.getElementById('inv-src-tag').textContent = '(seed)';
+    document.getElementById('inv-meta').textContent =
+      `${inv.p_ac_max_kw} kW AC  ·  η ${(inv.eta_max*100).toFixed(1)}%  ·  ${inv.mppt_count} MPPT`;
   }
 }
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('inverter-select').addEventListener('change', () => {
+    const v = document.getElementById('inverter-select').value;
+    if (v === '__catalog__') { switchTab('catalog'); return; }
+    updateInvMeta();
+  });
+});
 
-function onModuleChange() {
-  const id  = document.getElementById('module-select').value;
-  const mod = modules.find(m => m.id === id);
-  if (!mod) return;
-
-  document.getElementById('module-meta').innerHTML =
-    `${mod.width_m} m × ${mod.length_m} m &bull; `+
-    `η ${(mod.eta_ref*100).toFixed(1)}% &bull; `+
-    `γ = ${mod.temp_coeff_p_pct_k}%/K`;
-
-  document.getElementById('module-chips').innerHTML =
-    `<span class="chip">${mod.p_stc_w}W STC</span>`+
-    `<span class="chip">${(mod.width_m*mod.length_m).toFixed(2)} m²</span>`;
-
-  if (currentPoly) triggerLayout(currentPoly);
-}
-
-function redrawIfPolygon() {
-  if (currentPoly) triggerLayout(currentPoly);
-}
-
-// ── Draw events ───────────────────────────────────────────────────────────
-map.on(L.Draw.Event.CREATED, function(e) {
+// ═══════════════════════════════════════════════════════
+//  Draw events
+// ═══════════════════════════════════════════════════════
+map.on(L.Draw.Event.CREATED, e => {
   drawnItems.clearLayers();
   clearPanels();
   drawnItems.addLayer(e.layer);
-
   const lls = e.layer.getLatLngs();
-  // Polygon returns [[LatLng,...]] ; Rectangle returns [LatLng,...]
   const ring = Array.isArray(lls[0]) ? lls[0] : lls;
   currentPoly = ring.map(ll => [ll.lat, ll.lng]);
   triggerLayout(currentPoly);
 });
 
-map.on(L.Draw.Event.EDITED, function(e) {
+map.on(L.Draw.Event.EDITED, e => {
   e.layers.eachLayer(layer => {
-    const lls = layer.getLatLngs();
+    const lls  = layer.getLatLngs();
     const ring = Array.isArray(lls[0]) ? lls[0] : lls;
     currentPoly = ring.map(ll => [ll.lat, ll.lng]);
     triggerLayout(currentPoly);
   });
 });
 
-map.on(L.Draw.Event.DELETED, function() {
+map.on(L.Draw.Event.DELETED, () => {
   currentPoly = null;
   clearPanels();
   document.getElementById('layout-results').classList.add('hidden');
   document.getElementById('sim-results').classList.add('hidden');
 });
 
-// ── Layout ────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  Layout
+// ═══════════════════════════════════════════════════════
+function redrawIfPolygon() { if (currentPoly) triggerLayout(currentPoly); }
+
 async function triggerLayout(polygon) {
-  const moduleId   = document.getElementById('module-select').value;
-  const setback    = parseFloat(document.getElementById('setback').value)   || 0.5;
-  const rowGap     = parseFloat(document.getElementById('row-gap').value)   || 0.05;
-  const orientation = document.getElementById('orientation').value;
-
-  if (!moduleId) return;
-
+  if (!selectedMod) return;
   try {
     const resp = await fetch('/api/v1/layout/panels', {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         roof_polygon: polygon,
-        module_id:    moduleId,
-        setback_m:    setback,
-        row_gap_m:    rowGap,
+        module_id:    selectedMod.id,
+        setback_m:    parseFloat(document.getElementById('setback').value)  || 0.5,
+        row_gap_m:    parseFloat(document.getElementById('row-gap').value)  || 0.05,
         col_gap_m:    0.02,
-        orientation,
+        orientation:  document.getElementById('orientation').value,
       }),
     });
-
-    if (!resp.ok) {
-      const err = await resp.json();
-      console.error('Layout error:', err);
-      return;
-    }
-
+    if (!resp.ok) return;
     const layout = await resp.json();
     renderPanels(layout);
     showLayoutSummary(layout);
-
-  } catch (e) {
-    console.error('Layout request failed:', e);
-  }
+  } catch (e) { console.error('Layout failed:', e); }
 }
 
 function clearPanels() {
@@ -485,67 +464,51 @@ function clearPanels() {
 
 function renderPanels(layout) {
   clearPanels();
-  layout.panels.forEach(panel => {
-    const poly = L.polygon(panel.corners, {
-      color:       '#00d4ff',
-      fillColor:   '#0099bb',
-      fillOpacity: 0.55,
-      weight:      1,
+  layout.panels.forEach(p => {
+    const layer = L.polygon(p.corners, {
+      color: '#00d4ff', fillColor: '#0099bb', fillOpacity: 0.55, weight: 1,
     }).addTo(map);
-    panelLayers.push(poly);
+    panelLayers.push(layer);
   });
 }
 
 function showLayoutSummary(layout) {
-  document.getElementById('layout-results').classList.remove('hidden');
-  document.getElementById('panel-count').textContent  = layout.panel_count.toLocaleString();
-  document.getElementById('roof-area').textContent    = layout.roof_area_m2.toFixed(1)   + ' m²';
-  document.getElementById('usable-area').textContent  = layout.usable_area_m2.toFixed(1) + ' m²';
-  document.getElementById('installed-kw').textContent = layout.installed_kw.toFixed(2)   + ' kWp';
-  const [lat, lon] = layout.centroid;
-  document.getElementById('centroid-coords').textContent =
-    `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-
-  // Store for simulation
   window._layout = layout;
-  // Reset sim results
+  document.getElementById('layout-results').classList.remove('hidden');
   document.getElementById('sim-results').classList.add('hidden');
+  document.getElementById('panel-count').textContent    = layout.panel_count.toLocaleString();
+  document.getElementById('roof-area').textContent      = layout.roof_area_m2.toFixed(1)   + ' m²';
+  document.getElementById('usable-area').textContent    = layout.usable_area_m2.toFixed(1) + ' m²';
+  document.getElementById('installed-kw').textContent   = layout.installed_kw.toFixed(2)   + ' kWp';
+  const [lat, lon] = layout.centroid;
+  document.getElementById('centroid-coords').textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
 }
 
-// ── Simulation ────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  Simulation
+// ═══════════════════════════════════════════════════════
 async function runSimulation() {
-  const layout  = window._layout;
-  if (!layout || layout.panel_count === 0) {
-    alert('Draw a roof polygon first.');
-    return;
-  }
+  const layout = window._layout;
+  if (!layout || layout.panel_count === 0) { alert('Draw a roof polygon first.'); return; }
+  if (!selectedMod) { alert('Select a solar module first.'); return; }
 
-  const moduleId = document.getElementById('module-select').value;
-  const mod      = modules.find(m => m.id === moduleId);
-  if (!mod) return;
-
-  const invId = document.getElementById('inverter-select').value;
-  const inv   = inverters.find(i => i.id === invId);
-
-  const totalModules = layout.panel_count;
-  // Size inverter string: how many modules per inverter given inverter AC rating
-  const modulesPerInv = inv
-    ? Math.max(1, Math.round((inv.p_ac_max_kw * 1000) / mod.p_stc_w * 1.1))
-    : totalModules;
-  const nInverters = Math.max(1, Math.ceil(totalModules / modulesPerInv));
-
-  const [centLat, centLon] = layout.centroid;
+  const total   = layout.panel_count;
+  const pacKw   = selectedInv ? selectedInv.p_ac_max_kw : null;
+  const mppKw   = selectedMod.p_stc_w / 1000.0;
+  const modPerInv = pacKw ? Math.max(1, Math.round(pacKw / mppKw * 1.1)) : total;
+  const nInv      = Math.max(1, Math.ceil(total / modPerInv));
+  const [lat, lon] = layout.centroid;
 
   const payload = {
-    plant_name:                'Helios-Site-' + Date.now(),
-    latitude_deg:              centLat,
-    longitude_deg:             centLon,
-    n_inverters:               nInverters,
-    n_modules_per_inverter:    Math.ceil(totalModules / nInverters),
-    module_p_stc_w:            mod.p_stc_w,
-    module_temp_coeff_pct_k:   mod.temp_coeff_p_pct_k,
-    module_eta_ref:            mod.eta_ref,
-    dt_seconds:                3600.0,
+    plant_name:             'Helios-Site-' + Date.now(),
+    latitude_deg:           lat,
+    longitude_deg:          lon,
+    n_inverters:            nInv,
+    n_modules_per_inverter: Math.ceil(total / nInv),
+    module_p_stc_w:         selectedMod.p_stc_w,
+    module_temp_coeff_pct_k: selectedMod.temp_coeff_p_pct_k,
+    module_eta_ref:         selectedMod.eta_ref,
+    dt_seconds:             3600.0,
   };
 
   const btn = document.getElementById('run-btn');
@@ -553,68 +516,215 @@ async function runSimulation() {
   btn.disabled  = true;
 
   try {
-    // Use /run-sync so the UI works without a Celery/Redis stack
     const resp = await fetch('/api/v1/simulations/run-sync', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
-
-    if (!resp.ok) {
-      const err = await resp.json();
-      alert('Simulation failed: ' + (err.detail || JSON.stringify(err)));
-      return;
-    }
-
-    const result = await resp.json();
-    showSimResults(result);
-
-  } catch (e) {
-    alert('Network error: ' + e.message);
-  } finally {
-    btn.innerHTML = 'Run Annual Simulation';
-    btn.disabled  = false;
-  }
+    if (!resp.ok) { alert('Simulation failed: ' + (await resp.json()).detail); return; }
+    showSimResults(await resp.json());
+  } catch (e) { alert('Error: ' + e.message); }
+  finally { btn.innerHTML = 'Run Annual Simulation'; btn.disabled = false; }
 }
 
 function showSimResults(r) {
-  const div = document.getElementById('sim-results');
-  div.classList.remove('hidden');
-  document.getElementById('sim-grid').innerHTML = `
-    <span class="label-cell">Annual yield</span>
-    <span class="val">${(r.annual_yield_kwh/1000).toFixed(1)} MWh</span>
-
-    <span class="label-cell">Specific yield</span>
-    <span class="val">${r.specific_yield_kwh_kw.toFixed(0)} kWh/kWp</span>
-
-    <span class="label-cell">Performance ratio</span>
-    <span class="val">${(r.performance_ratio*100).toFixed(1)}%</span>
-
-    <div class="divider"></div>
-
-    <span class="label-cell">Installed capacity</span>
-    <span class="val">${r.p_installed_kw.toFixed(2)} kWp</span>
-
-    <span class="label-cell">Modules simulated</span>
-    <span class="val">${r.n_modules.toLocaleString()}</span>
-
-    <div class="divider"></div>
-
-    <span class="label-cell">Peak POA irradiance</span>
-    <span class="val">${r.peak_poa_wm2.toFixed(0)} W/m²</span>
-
-    <span class="label-cell">Mean cell temp</span>
-    <span class="val">${r.mean_cell_temp_c.toFixed(1)} °C</span>
+  document.getElementById('sim-results').classList.remove('hidden');
+  document.getElementById('sim-kv').innerHTML = `
+    <span class="k">Annual yield</span>   <span class="v">${(r.annual_yield_kwh/1000).toFixed(1)} MWh</span>
+    <span class="k">Specific yield</span> <span class="v">${r.specific_yield_kwh_kw.toFixed(0)} kWh/kWp</span>
+    <span class="k">Performance ratio</span> <span class="v">${(r.performance_ratio*100).toFixed(1)}%</span>
+    <div class="div"></div>
+    <span class="k">Installed DC</span>   <span class="v">${r.p_installed_kw.toFixed(2)} kWp</span>
+    <span class="k">Modules</span>        <span class="v">${r.n_modules.toLocaleString()}</span>
+    <div class="div"></div>
+    <span class="k">Peak POA</span>       <span class="v">${r.peak_poa_wm2.toFixed(0)} W/m²</span>
+    <span class="k">Mean cell temp</span> <span class="v">${r.mean_cell_temp_c.toFixed(1)} °C</span>
   `;
-  // Scroll to results
-  div.scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('sim-results').scrollIntoView({ behavior: 'smooth' });
 }
 
-// ── Location search (Nominatim) ───────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  Catalog — modules
+// ═══════════════════════════════════════════════════════
+async function searchCatModules() {
+  catModOffset = 0;
+  const q = document.getElementById('cat-mod-q').value.trim();
+  const data = await fetchCatModules(q, 0);
+  renderCatModList(data, false);
+}
+
+async function loadMoreModules() {
+  catModOffset += CAT_PAGE;
+  const q = document.getElementById('cat-mod-q').value.trim();
+  const data = await fetchCatModules(q, catModOffset);
+  renderCatModList(data, true);
+}
+
+async function fetchCatModules(q, offset) {
+  const url = `/api/v1/catalog/modules?q=${encodeURIComponent(q)}&limit=${CAT_PAGE}&offset=${offset}`;
+  const resp = await fetch(url);
+  return resp.json();
+}
+
+function renderCatModList(data, append) {
+  const list = document.getElementById('cat-mod-list');
+  if (!append) list.innerHTML = '';
+
+  if (!data.items || data.items.length === 0) {
+    if (!append) list.innerHTML = '<div class="cat-empty">No modules found</div>';
+    document.getElementById('cat-mod-more').classList.add('hidden');
+    return;
+  }
+
+  data.items.forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'cat-item';
+    div.dataset.id = m.id;
+    const eta = (m.eta_ref * 100).toFixed(1);
+    div.innerHTML =
+      `<div class="ci-name">${m.name}</div>` +
+      `<div class="ci-meta">` +
+        `<span class="ci-badge">${m.p_stc_w}W</span>` +
+        `<span class="ci-badge">${m.technology}</span>` +
+        `${m.width_m.toFixed(3)} × ${m.length_m.toFixed(3)} m  ·  η ${eta}%` +
+        (m.bifacial ? '  ·  <span style="color:#4caf50">bifacial</span>' : '') +
+      `</div>`;
+    div.onclick = () => selectCatModule(m, div);
+    list.appendChild(div);
+  });
+
+  const hasMore = data.offset + data.items.length < data.total;
+  document.getElementById('cat-mod-more').classList.toggle('hidden', !hasMore);
+  document.getElementById('cat-mod-ver').textContent = `pvlib ${data.pvlib_version}  ·  ${data.total.toLocaleString()} total`;
+}
+
+function selectCatModule(m, el) {
+  document.querySelectorAll('#cat-mod-list .cat-item').forEach(x => x.classList.remove('selected'));
+  el.classList.add('selected');
+
+  selectedMod = {
+    id:                  m.id,
+    manufacturer:        m.name.split(' ')[0],
+    model_name:          m.name,
+    p_stc_w:             m.p_stc_w,
+    width_m:             m.width_m,
+    length_m:            m.length_m,
+    temp_coeff_p_pct_k:  m.temp_coeff_p_pct_k,
+    eta_ref:             m.eta_ref,
+  };
+
+  // Update setup tab display
+  document.getElementById('mod-src-tag').textContent = '(catalog)';
+  renderModMeta(selectedMod);
+
+  // Update dropdown to show a placeholder for catalog selection
+  const sel = document.getElementById('module-select');
+  // Add a temporary option if not already there
+  let opt = sel.querySelector('option[value="__cat_selected__"]');
+  if (!opt) {
+    opt = document.createElement('option');
+    opt.value = '__cat_selected__';
+    sel.insertBefore(opt, sel.firstChild);
+  }
+  opt.textContent = `★ ${m.name} — ${m.p_stc_w}W`;
+  sel.value = '__cat_selected__';
+
+  if (currentPoly) triggerLayout(currentPoly);
+  switchTab('setup');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Catalog — inverters
+// ═══════════════════════════════════════════════════════
+async function searchCatInverters() {
+  catInvOffset = 0;
+  const q = document.getElementById('cat-inv-q').value.trim();
+  const data = await fetchCatInverters(q, 0);
+  renderCatInvList(data, false);
+}
+
+async function loadMoreInverters() {
+  catInvOffset += CAT_PAGE;
+  const q = document.getElementById('cat-inv-q').value.trim();
+  const data = await fetchCatInverters(q, catInvOffset);
+  renderCatInvList(data, true);
+}
+
+async function fetchCatInverters(q, offset) {
+  const url = `/api/v1/catalog/inverters?q=${encodeURIComponent(q)}&limit=${CAT_PAGE}&offset=${offset}`;
+  const resp = await fetch(url);
+  return resp.json();
+}
+
+function renderCatInvList(data, append) {
+  const list = document.getElementById('cat-inv-list');
+  if (!append) list.innerHTML = '';
+
+  if (!data.items || data.items.length === 0) {
+    if (!append) list.innerHTML = '<div class="cat-empty">No inverters found</div>';
+    document.getElementById('cat-inv-more').classList.add('hidden');
+    return;
+  }
+
+  data.items.forEach(inv => {
+    const div = document.createElement('div');
+    div.className = 'cat-item';
+    div.dataset.id = inv.id;
+    const kw    = (inv.p_ac_max_w / 1000).toFixed(1);
+    const eta   = (inv.eta_max * 100).toFixed(1);
+    const vmax  = inv.v_dc_max_v ? `${inv.v_dc_max_v}V max` : '';
+    const mppt  = (inv.mppt_low_v && inv.mppt_high_v)
+      ? `MPPT ${inv.mppt_low_v}–${inv.mppt_high_v}V` : '';
+    div.innerHTML =
+      `<div class="ci-name">${inv.manufacturer ? inv.manufacturer + ' — ' : ''}${inv.model}</div>` +
+      `<div class="ci-meta">` +
+        `<span class="ci-badge">${kw} kW</span>` +
+        `<span class="ci-badge">η ${eta}%</span>` +
+        [vmax, mppt].filter(Boolean).join('  ·  ') +
+      `</div>`;
+    div.onclick = () => selectCatInverter(inv, div);
+    list.appendChild(div);
+  });
+
+  const hasMore = data.offset + data.items.length < data.total;
+  document.getElementById('cat-inv-more').classList.toggle('hidden', !hasMore);
+  document.getElementById('cat-inv-ver').textContent = `pvlib ${data.pvlib_version}  ·  ${data.total.toLocaleString()} total`;
+}
+
+function selectCatInverter(inv, el) {
+  document.querySelectorAll('#cat-inv-list .cat-item').forEach(x => x.classList.remove('selected'));
+  el.classList.add('selected');
+
+  selectedInv = {
+    id:          inv.id,
+    p_ac_max_kw: inv.p_ac_max_w / 1000,
+    p_dc_max_kw: inv.p_dc_max_w / 1000,
+    eta_max:     inv.eta_max,
+  };
+
+  document.getElementById('inv-src-tag').textContent = '(catalog)';
+  document.getElementById('inv-meta').textContent =
+    `${(inv.p_ac_max_w/1000).toFixed(1)} kW AC  ·  η ${(inv.eta_max*100).toFixed(1)}%`;
+
+  // Update dropdown
+  const sel = document.getElementById('inverter-select');
+  let opt = sel.querySelector('option[value="__cat_inv_selected__"]');
+  if (!opt) {
+    opt = document.createElement('option');
+    opt.value = '__cat_inv_selected__';
+    sel.insertBefore(opt, sel.firstChild);
+  }
+  opt.textContent = `★ ${inv.manufacturer ? inv.manufacturer + ' ' : ''}${inv.model} — ${(inv.p_ac_max_w/1000).toFixed(0)}kW`;
+  sel.value = '__cat_inv_selected__';
+
+  switchTab('setup');
+}
+
+// ═══════════════════════════════════════════════════════
+//  Location search (Nominatim)
+// ═══════════════════════════════════════════════════════
 async function searchLocation() {
   const q = document.getElementById('search-input').value.trim();
   if (!q) return;
-
   try {
     const resp = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
@@ -622,17 +732,36 @@ async function searchLocation() {
     );
     const data = await resp.json();
     if (data.length > 0) {
-      map.setView([parseFloat(data[0].lat), parseFloat(data[0].lon)], 19);
+      const lat = parseFloat(data[0].lat);
+      const lon = parseFloat(data[0].lon);
+      map.setView([lat, lon], 19);
+      // Drop a location pin
+      if (coordMarker) map.removeLayer(coordMarker);
+      coordMarker = L.marker([lat, lon])
+        .addTo(map)
+        .bindPopup(`📍 ${lat.toFixed(6)}, ${lon.toFixed(6)}<br><small>${data[0].display_name}</small>`)
+        .openPopup();
     } else {
       alert('Location not found. Try a more specific address.');
     }
-  } catch (e) {
-    alert('Search failed: ' + e.message);
-  }
+  } catch (e) { alert('Search error: ' + e.message); }
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────
-loadComponents();
+// ═══════════════════════════════════════════════════════
+//  Debounce utility
+// ═══════════════════════════════════════════════════════
+function debounce(fn, ms) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+//  Boot
+// ═══════════════════════════════════════════════════════
+loadSeeds();
 </script>
 </body>
 </html>

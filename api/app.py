@@ -49,6 +49,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from api.catalog import get_module_by_id as catalog_module_by_id
+from api.catalog import search_inverters, search_modules
 from api.celery_app import celery_app
 from api.layout import compute_panel_layout
 from api.runner import run_annual_simulation
@@ -159,20 +161,76 @@ async def panel_layout(request: PanelLayoutRequest) -> PanelLayoutResponse:
     Returns panel count, per-panel corner coordinates for map rendering,
     roof area, usable area, and installed kWp.
     """
-    module = module_by_id(request.module_id)
-    if module is None:
-        raise HTTPException(status_code=404, detail=f"Module {request.module_id!r} not found")
+    # Check seed modules first (signed VerifiedModuleProfile), then CEC catalog
+    seed = module_by_id(request.module_id)
+    if seed is not None:
+        width_m, length_m, p_stc_w = seed.width_m, seed.length_m, seed.p_stc_w
+    else:
+        cat = catalog_module_by_id(request.module_id)
+        if cat is None:
+            raise HTTPException(status_code=404, detail=f"Module {request.module_id!r} not found")
+        width_m = float(cat["width_m"])
+        length_m = float(cat["length_m"])
+        p_stc_w = float(cat["p_stc_w"])
 
     return compute_panel_layout(
         roof_polygon_latlon=request.roof_polygon,
-        panel_width_m=module.width_m,
-        panel_length_m=module.length_m,
-        panel_p_stc_w=module.p_stc_w,
+        panel_width_m=width_m,
+        panel_length_m=length_m,
+        panel_p_stc_w=p_stc_w,
         setback_m=request.setback_m,
         row_gap_m=request.row_gap_m,
         col_gap_m=request.col_gap_m,
         orientation=request.orientation,
     )
+
+
+# ---------------------------------------------------------------------------
+# CEC / SAM component catalog  (21 500 modules, 3 200 inverters from pvlib)
+# ---------------------------------------------------------------------------
+
+
+@app.get(
+    "/api/v1/catalog/modules",
+    tags=["catalog"],
+    summary="Search CEC module database (~21 500 entries, updates with pvlib)",
+)
+async def catalog_modules(
+    q: str = "",
+    limit: int = 20,
+    offset: int = 0,
+) -> dict:  # type: ignore[type-arg]
+    """
+    Full-text search over the NREL CEC module database bundled with pvlib.
+
+    - ``q`` — substring search in module name (manufacturer + model, case-insensitive)
+    - ``limit`` — page size (max 100)
+    - ``offset`` — pagination offset
+
+    The catalog version tracks the installed pvlib package.
+    Run ``pip install --upgrade pvlib`` and restart to get the latest database.
+    """
+    return search_modules(q=q, limit=limit, offset=offset)
+
+
+@app.get(
+    "/api/v1/catalog/inverters",
+    tags=["catalog"],
+    summary="Search SAM CEC inverter database (~3 200 entries, updates with pvlib)",
+)
+async def catalog_inverters(
+    q: str = "",
+    limit: int = 20,
+    offset: int = 0,
+) -> dict:  # type: ignore[type-arg]
+    """
+    Full-text search over the NREL SAM inverter database bundled with pvlib.
+
+    - ``q`` — substring search in inverter name
+    - ``limit`` — page size (max 100)
+    - ``offset`` — pagination offset
+    """
+    return search_inverters(q=q, limit=limit, offset=offset)
 
 
 # ---------------------------------------------------------------------------
