@@ -52,6 +52,7 @@ from fastapi.staticfiles import StaticFiles
 from api.catalog import get_module_by_id as catalog_module_by_id
 from api.catalog import search_inverters, search_modules
 from api.celery_app import celery_app
+from api.config import settings
 from api.layout import compute_panel_layout
 from api.runner import run_annual_simulation
 from api.schemas import (
@@ -88,6 +89,17 @@ app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 async def index() -> FileResponse:
     """Serve the interactive site planner UI."""
     return FileResponse(str(_STATIC_DIR / "index.html"))
+
+
+# ---------------------------------------------------------------------------
+# Config — expose non-secret runtime keys to the front-end
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/v1/config/maps-key", tags=["config"], include_in_schema=False)
+async def get_maps_key() -> dict[str, str]:
+    """Return the Google Maps JavaScript API key so the front-end never hard-codes it."""
+    return {"key": settings.google_maps_key}
 
 
 # ---------------------------------------------------------------------------

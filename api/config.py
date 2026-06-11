@@ -13,11 +13,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="HELIOS_")
+    model_config = SettingsConfigDict(env_prefix="HELIOS_", env_file=".env")
 
     redis_url: str = "redis://localhost:6379/0"
     result_backend: str = "redis://localhost:6379/1"
     task_result_ttl_seconds: int = 86_400  # 24 hours
+    google_maps_key: str = ""
 
 
 settings = Settings()

@@ -4,8 +4,6 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Helios Core — Site Planner</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', system-ui, sans-serif; display: flex; height: 100vh; overflow: hidden; background: #0f0f23; color: #e0e0e0; }
@@ -72,7 +70,7 @@
     .cat-item .ci-name { font-size: 12px; color: #e0e0e0; font-weight: 500; line-height: 1.3; }
     .cat-item .ci-meta { font-size: 10px; color: #6060a0; margin-top: 2px; }
     .cat-item .ci-badge { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 9px; font-weight: 700; background: #00d4ff18; color: #00d4ff; margin-right: 4px; }
-    .cat-footer { padding: 6px 10px; font-size: 10px; color: #4040608; text-align: center; }
+    .cat-footer { padding: 6px 10px; font-size: 10px; color: #404060; text-align: center; }
     .cat-empty { padding: 20px; text-align: center; color: #4040a0; font-size: 12px; }
 
     .load-more { width: 100%; padding: 7px; background: none; border: 1px solid #2a2a50; color: #6060a0; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; transition: all 0.15s; }
@@ -85,28 +83,43 @@
 
     .hidden { display: none !important; }
 
-    /* ── Map ── */
-    #map { flex: 1; position: relative; }
+    /* ── Map area ── */
+    #map { flex: 1; position: relative; overflow: hidden; }
+    #gmap { position: absolute; inset: 0; }
 
-    /* Coordinate display */
+    /* Coordinate display overlay */
     #coord-box {
-      position: absolute; bottom: 28px; right: 10px; z-index: 900;
-      background: #1a1a2ecc; color: #00d4ff; padding: 5px 10px;
+      position: absolute; bottom: 42px; right: 10px; z-index: 1001;
+      background: rgba(26,26,46,0.88); color: #00d4ff; padding: 5px 10px;
       border-radius: 4px; font-size: 11px; font-family: monospace;
       border: 1px solid #2a2a50; backdrop-filter: blur(4px);
-      pointer-events: none;
+      pointer-events: none; white-space: nowrap;
     }
     #coord-box .coord-label { font-size: 9px; color: #6060a0; display: block; margin-bottom: 1px; }
-    #coord-box .coord-val { letter-spacing: 0.3px; }
 
-    /* Click-pin popup style override */
-    .leaflet-popup-content-wrapper { background: #1a1a2e; color: #e0e0e0; border: 1px solid #2a2a50; border-radius: 6px; }
-    .leaflet-popup-tip { background: #1a1a2e; }
-    .leaflet-popup-content { font-size: 12px; font-family: monospace; color: #00d4ff; margin: 8px 12px; }
+    /* Custom map control buttons */
+    .gm-ctrl-btn {
+      background: rgba(26,26,46,0.92); border: 1px solid #2a2a50;
+      color: #00d4ff; font-size: 11px; font-weight: 600;
+      padding: 5px 9px; border-radius: 4px; cursor: pointer;
+      margin: 5px 5px 0 0; font-family: 'Segoe UI', system-ui, sans-serif;
+      backdrop-filter: blur(4px); transition: background 0.15s;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+    }
+    .gm-ctrl-btn:hover { background: rgba(13,59,102,0.95); }
+    .gm-ctrl-btn.active { background: rgba(0,212,255,0.18); border-color: #00d4ff; }
 
-    /* Draw toolbar dark theme */
-    .leaflet-draw-toolbar a { background-color: #1a1a2e !important; border-color: #2a2a50 !important; }
-    .leaflet-draw-toolbar a svg path { fill: #00d4ff !important; stroke: #00d4ff !important; }
+    /* Google Places Autocomplete dropdown theming */
+    .pac-container {
+      background: #1a1a2e !important; border: 1px solid #2a2a50 !important;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5) !important;
+      font-family: 'Segoe UI', system-ui, sans-serif !important; z-index: 9999 !important;
+    }
+    .pac-item { background: #1a1a2e !important; color: #a0a0c0 !important; border-top: 1px solid #2a2a4030 !important; padding: 6px 10px !important; cursor: pointer !important; }
+    .pac-item:hover, .pac-item-selected { background: #00d4ff12 !important; }
+    .pac-item-query { color: #e0e0e0 !important; font-size: 12px !important; }
+    .pac-matched { color: #00d4ff !important; font-weight: 600 !important; }
+    .pac-icon { display: none !important; }
   </style>
 </head>
 <body>
@@ -127,13 +140,13 @@
   <!-- ════ SETUP TAB ════ -->
   <div id="tab-setup" class="tab-panel active">
 
-    <!-- Location search -->
+    <!-- Location search (wired to Google Places Autocomplete) -->
     <div class="section">
       <label>Search location</label>
       <div class="row2">
         <input id="search-input" type="text" placeholder="Address, city, or coordinates…"
-               onkeydown="if(event.key==='Enter') searchLocation()"/>
-        <button class="btn" onclick="searchLocation()">Go</button>
+               autocomplete="off"/>
+        <button class="btn" onclick="geocodeManual()">Go</button>
       </div>
     </div>
 
@@ -182,8 +195,9 @@
     <div class="section">
       <div class="instruction">
         <strong>1.</strong> Search your site above.<br>
-        <strong>2.</strong> Click the <strong>polygon tool</strong> on the map and trace the roof outline — double-click to close.<br>
-        <strong>3.</strong> Panel layout appears instantly. Click <em>Run Simulation</em> for annual yield.
+        <strong>2.</strong> Click the <strong>polygon or rectangle tool</strong> on the map and trace the roof — double-click to close.<br>
+        <strong>3.</strong> Panel layout appears instantly. Click <em>Run Simulation</em> for annual yield.<br>
+        <strong>Tip:</strong> Use <strong>3D / 2D</strong> and <strong>Street View</strong> (pegman) for context.
       </div>
     </div>
 
@@ -248,94 +262,317 @@
 
 <!-- ══════════════ MAP ══════════════ -->
 <div id="map">
+  <div id="gmap"></div>
   <div id="coord-box">
     <span class="coord-label">Coordinates (WGS84)</span>
-    <span class="coord-val" id="coord-val">Move cursor over map</span>
+    <span id="coord-val" style="letter-spacing:0.3px">Move cursor over map</span>
   </div>
 </div>
 
 <!-- ══════════════ SCRIPTS ══════════════ -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════
-//  Map
+//  App state
 // ═══════════════════════════════════════════════════════
-const map = L.map('map', { zoomControl: true }).setView([5.55, -0.20], 17);
+let gmap             = null;   // google.maps.Map instance
+let drawingMgr       = null;   // DrawingManager
+let roofOverlay      = null;   // current Polygon or Rectangle on map
+let coordMarker      = null;   // right-click pin
+let coordInfoWindow  = null;   // info window for coordMarker
+let panelPolygons    = [];     // google.maps.Polygon array for panel grid
+let currentPoly      = null;   // [[lat,lng], ...] — sent to layout API
+let tiltOn           = false;  // 3D tilt state
 
-L.tileLayer(
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  { attribution: 'Tiles &copy; Esri', maxZoom: 22, maxNativeZoom: 21 }
-).addTo(map);
+let seedModules      = [];
+let seedInverters    = [];
+let selectedMod      = null;
+let selectedInv      = null;
 
-L.tileLayer(
-  'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
-  { maxZoom: 22, maxNativeZoom: 21, opacity: 0.65 }
-).addTo(map);
-
-// ── Draw control ────────────────────────────────────────
-const drawnItems = new L.FeatureGroup().addTo(map);
-const drawControl = new L.Control.Draw({
-  edit: { featureGroup: drawnItems, remove: true },
-  draw: {
-    polygon:      { allowIntersection: false, shapeOptions: { color: '#ff6b35', fillColor: '#ff6b3520', weight: 2 }, showArea: true },
-    rectangle:    { shapeOptions: { color: '#ff6b35', fillColor: '#ff6b3520', weight: 2 } },
-    polyline:     false, circle: false, circlemarker: false, marker: false,
-  },
-});
-map.addControl(drawControl);
-
-// ── Coordinate pointer ────────────────────────────────
-map.on('mousemove', e => {
-  const lat = e.latlng.lat.toFixed(6);
-  const lon = e.latlng.lng.toFixed(6);
-  const ns  = lat >= 0 ? 'N' : 'S';
-  const ew  = lon >= 0 ? 'E' : 'W';
-  document.getElementById('coord-val').textContent =
-    `${Math.abs(lat)}° ${ns},  ${Math.abs(lon)}° ${ew}`;
-});
-
-// Click-to-pin: shows coordinates on right-click to avoid clashing with draw tool
-let coordMarker = null;
-map.on('contextmenu', e => {
-  if (coordMarker) map.removeLayer(coordMarker);
-  const lat = e.latlng.lat.toFixed(6);
-  const lon = e.latlng.lng.toFixed(6);
-  coordMarker = L.marker(e.latlng)
-    .addTo(map)
-    .bindPopup(`📍 ${lat}, ${lon}`)
-    .openPopup();
-});
+let catModOffset     = 0;
+let catInvOffset     = 0;
+const CAT_PAGE       = 20;
 
 // ═══════════════════════════════════════════════════════
-//  State
+//  Boot sequence: fetch key → inject Maps script → init
 // ═══════════════════════════════════════════════════════
-let seedModules   = [];
-let seedInverters = [];
-let selectedMod   = null;   // { id, p_stc_w, width_m, length_m, temp_coeff_p_pct_k, eta_ref, ... }
-let selectedInv   = null;   // { p_ac_max_kw, ... }
-let panelLayers   = [];
-let currentPoly   = null;
+async function initApp() {
+  let key = '';
+  try {
+    const r = await fetch('/api/v1/config/maps-key');
+    if (r.ok) key = (await r.json()).key || '';
+  } catch (_) {}
 
-// Catalog pagination state
-let catModOffset  = 0;
-let catInvOffset  = 0;
-const CAT_PAGE    = 20;
+  if (!key) {
+    document.getElementById('gmap').innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#ff6b35;font-size:13px;background:#0f0f23">' +
+      'Google Maps key not configured. Set HELIOS_GOOGLE_MAPS_KEY in .env</div>';
+    return;
+  }
+
+  await new Promise((resolve, reject) => {
+    window.__gmInit = resolve;
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&libraries=drawing,places&callback=__gmInit&loading=async`;
+    s.async = true;
+    s.onerror = () => reject(new Error('Google Maps failed to load'));
+    document.head.appendChild(s);
+  });
+
+  setupMap();
+  setupAutocomplete();
+  loadSeeds();
+}
+
+// ═══════════════════════════════════════════════════════
+//  Map initialisation
+// ═══════════════════════════════════════════════════════
+function setupMap() {
+  const G = google.maps;
+
+  gmap = new G.Map(document.getElementById('gmap'), {
+    center:           { lat: 5.55, lng: -0.20 },  // Accra default
+    zoom:             18,
+    mapTypeId:        'satellite',
+    tilt:             0,
+    heading:          0,
+    // Controls
+    mapTypeControl:   true,
+    mapTypeControlOptions: {
+      style:      G.MapTypeControlStyle.DROPDOWN_MENU,
+      position:   G.ControlPosition.TOP_RIGHT,
+      mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
+    },
+    zoomControl:            true,
+    zoomControlOptions:     { position: G.ControlPosition.RIGHT_CENTER },
+    streetViewControl:      true,
+    streetViewControlOptions: { position: G.ControlPosition.RIGHT_BOTTOM },
+    fullscreenControl:      true,
+    fullscreenControlOptions: { position: G.ControlPosition.RIGHT_TOP },
+    scaleControl:           true,
+    rotateControl:          true,
+    gestureHandling:        'greedy',
+  });
+
+  // ── Coordinate display on mouse move ────────────────
+  gmap.addListener('mousemove', e => {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+    const ns = lat >= 0 ? 'N' : 'S';
+    const ew = lng >= 0 ? 'E' : 'W';
+    document.getElementById('coord-val').textContent =
+      `${Math.abs(lat).toFixed(6)}° ${ns},  ${Math.abs(lng).toFixed(6)}° ${ew}`;
+  });
+
+  // ── Right-click: drop coordinate pin ────────────────
+  coordInfoWindow = new G.InfoWindow();
+  gmap.addListener('rightclick', e => {
+    if (coordMarker) coordMarker.setMap(null);
+    const lat = e.latLng.lat().toFixed(6);
+    const lng = e.latLng.lng().toFixed(6);
+    coordMarker = new G.Marker({ position: e.latLng, map: gmap });
+    coordInfoWindow.setContent(
+      `<div style="color:#00d4ff;font-family:monospace;font-size:12px;background:#1a1a2e;padding:2px 4px">` +
+      `&#128205; ${lat},  ${lng}</div>`
+    );
+    coordInfoWindow.open(gmap, coordMarker);
+  });
+
+  // ── Drawing Manager ──────────────────────────────────
+  drawingMgr = new G.drawing.DrawingManager({
+    drawingMode: null,
+    drawingControl: true,
+    drawingControlOptions: {
+      position:     G.ControlPosition.TOP_LEFT,
+      drawingModes: [
+        G.drawing.OverlayType.POLYGON,
+        G.drawing.OverlayType.RECTANGLE,
+      ],
+    },
+    polygonOptions: {
+      strokeColor:   '#ff6b35', strokeOpacity: 0.9, strokeWeight: 2,
+      fillColor:     '#ff6b35', fillOpacity: 0.15, editable: true, draggable: false,
+    },
+    rectangleOptions: {
+      strokeColor:   '#ff6b35', strokeOpacity: 0.9, strokeWeight: 2,
+      fillColor:     '#ff6b35', fillOpacity: 0.15, editable: true, draggable: false,
+    },
+  });
+  drawingMgr.setMap(gmap);
+
+  G.event.addListener(drawingMgr, 'polygoncomplete', poly => {
+    clearRoof();
+    roofOverlay = poly;
+    drawingMgr.setDrawingMode(null);
+    const path = poly.getPath();
+    currentPoly = pathToArray(path);
+    triggerLayout(currentPoly);
+    // Re-trigger when user edits the polygon
+    G.event.addListener(path, 'set_at',    () => { currentPoly = pathToArray(path); triggerLayout(currentPoly); });
+    G.event.addListener(path, 'insert_at', () => { currentPoly = pathToArray(path); triggerLayout(currentPoly); });
+    G.event.addListener(path, 'remove_at', () => { currentPoly = pathToArray(path); triggerLayout(currentPoly); });
+  });
+
+  G.event.addListener(drawingMgr, 'rectanglecomplete', rect => {
+    clearRoof();
+    roofOverlay = rect;
+    drawingMgr.setDrawingMode(null);
+    currentPoly = boundsToArray(rect.getBounds());
+    triggerLayout(currentPoly);
+    G.event.addListener(rect, 'bounds_changed', () => {
+      currentPoly = boundsToArray(rect.getBounds());
+      triggerLayout(currentPoly);
+    });
+  });
+
+  // ── Custom control: 3D tilt toggle ──────────────────
+  const tiltBtn = document.createElement('button');
+  tiltBtn.id        = 'tilt-btn';
+  tiltBtn.className = 'gm-ctrl-btn';
+  tiltBtn.textContent = '3D';
+  tiltBtn.title     = 'Toggle 45° 3D tilt (where imagery is available)';
+  tiltBtn.onclick = () => {
+    tiltOn = !tiltOn;
+    gmap.setTilt(tiltOn ? 45 : 0);
+    tiltBtn.textContent = tiltOn ? '2D' : '3D';
+    tiltBtn.classList.toggle('active', tiltOn);
+  };
+  gmap.controls[G.ControlPosition.TOP_LEFT].push(tiltBtn);
+
+  // ── Custom control: Clear roof ───────────────────────
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'gm-ctrl-btn';
+  clearBtn.textContent = '✕ Clear roof';
+  clearBtn.title = 'Remove roof outline and panel layout';
+  clearBtn.onclick = clearAll;
+  gmap.controls[G.ControlPosition.TOP_LEFT].push(clearBtn);
+}
+
+// ═══════════════════════════════════════════════════════
+//  Places Autocomplete for location search
+// ═══════════════════════════════════════════════════════
+function setupAutocomplete() {
+  const input = document.getElementById('search-input');
+  const ac = new google.maps.places.Autocomplete(input, {
+    fields: ['geometry', 'name', 'formatted_address'],
+  });
+  ac.addListener('place_changed', () => {
+    const place = ac.getPlace();
+    if (!place.geometry || !place.geometry.location) return;
+    if (place.geometry.viewport) {
+      gmap.fitBounds(place.geometry.viewport);
+    } else {
+      gmap.setCenter(place.geometry.location);
+      gmap.setZoom(19);
+    }
+    // Drop a pin at the searched location
+    if (coordMarker) coordMarker.setMap(null);
+    coordMarker = new google.maps.Marker({ position: place.geometry.location, map: gmap });
+    coordInfoWindow.setContent(
+      `<div style="color:#00d4ff;font-family:monospace;font-size:12px;background:#1a1a2e;padding:2px 4px">` +
+      `&#128205; ${place.formatted_address || place.name}</div>`
+    );
+    coordInfoWindow.open(gmap, coordMarker);
+  });
+  // Prevent the form from submitting when the user presses Enter
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') e.preventDefault(); });
+}
+
+// Fallback: manual geocode via Places API when user presses "Go"
+function geocodeManual() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q || !gmap) return;
+  const geocoder = new google.maps.Geocoder();
+  geocoder.geocode({ address: q }, (results, status) => {
+    if (status === 'OK' && results.length > 0) {
+      const loc = results[0].geometry.location;
+      if (results[0].geometry.viewport) gmap.fitBounds(results[0].geometry.viewport);
+      else { gmap.setCenter(loc); gmap.setZoom(19); }
+      if (coordMarker) coordMarker.setMap(null);
+      coordMarker = new google.maps.Marker({ position: loc, map: gmap });
+      coordInfoWindow.setContent(
+        `<div style="color:#00d4ff;font-family:monospace;font-size:12px;background:#1a1a2e;padding:2px 4px">` +
+        `&#128205; ${results[0].formatted_address}</div>`
+      );
+      coordInfoWindow.open(gmap, coordMarker);
+    } else {
+      alert('Location not found. Try a more specific address.');
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  Geometry helpers
+// ═══════════════════════════════════════════════════════
+function pathToArray(path) {
+  const arr = [];
+  for (let i = 0; i < path.getLength(); i++) {
+    const ll = path.getAt(i);
+    arr.push([ll.lat(), ll.lng()]);
+  }
+  return arr;
+}
+
+function boundsToArray(bounds) {
+  const ne = bounds.getNorthEast();
+  const sw = bounds.getSouthWest();
+  return [
+    [ne.lat(), sw.lng()],  // NW
+    [ne.lat(), ne.lng()],  // NE
+    [sw.lat(), ne.lng()],  // SE
+    [sw.lat(), sw.lng()],  // SW
+  ];
+}
+
+// ═══════════════════════════════════════════════════════
+//  Roof / panel management
+// ═══════════════════════════════════════════════════════
+function clearRoof() {
+  if (roofOverlay) { roofOverlay.setMap(null); roofOverlay = null; }
+  clearPanels();
+}
+
+function clearAll() {
+  clearRoof();
+  currentPoly = null;
+  document.getElementById('layout-results').classList.add('hidden');
+  document.getElementById('sim-results').classList.add('hidden');
+}
+
+function clearPanels() {
+  panelPolygons.forEach(p => p.setMap(null));
+  panelPolygons = [];
+}
+
+function renderPanels(layout) {
+  clearPanels();
+  layout.panels.forEach(panel => {
+    const poly = new google.maps.Polygon({
+      paths:          panel.corners.map(([lat, lng]) => ({ lat, lng })),
+      strokeColor:    '#00d4ff',
+      strokeOpacity:  0.9,
+      strokeWeight:   1,
+      fillColor:      '#0099bb',
+      fillOpacity:    0.55,
+      map:            gmap,
+      clickable:      false,
+    });
+    panelPolygons.push(poly);
+  });
+}
 
 // ═══════════════════════════════════════════════════════
 //  Tab switching
 // ═══════════════════════════════════════════════════════
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const tabs = ['setup', 'catalog'];
-    b.classList.toggle('active', tabs[i] === name);
+    b.classList.toggle('active', ['setup', 'catalog'][i] === name);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
 }
 
 // ═══════════════════════════════════════════════════════
-//  Load seed components on boot
+//  Load seed components
 // ═══════════════════════════════════════════════════════
 async function loadSeeds() {
   try {
@@ -368,7 +605,7 @@ function onSeedModuleChange() {
   if (id === '__catalog__') { switchTab('catalog'); return; }
   const m = seedModules.find(x => x.id === id);
   if (!m) return;
-  selectedMod = { ...m, model_name: m.model_name };
+  selectedMod = { ...m };
   document.getElementById('mod-src-tag').textContent = '(seed)';
   renderModMeta(m);
   if (currentPoly) triggerLayout(currentPoly);
@@ -393,41 +630,14 @@ function updateInvMeta() {
       `${inv.p_ac_max_kw} kW AC  ·  η ${(inv.eta_max*100).toFixed(1)}%  ·  ${inv.mppt_count} MPPT`;
   }
 }
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('inverter-select').addEventListener('change', () => {
     const v = document.getElementById('inverter-select').value;
     if (v === '__catalog__') { switchTab('catalog'); return; }
     updateInvMeta();
   });
-});
-
-// ═══════════════════════════════════════════════════════
-//  Draw events
-// ═══════════════════════════════════════════════════════
-map.on(L.Draw.Event.CREATED, e => {
-  drawnItems.clearLayers();
-  clearPanels();
-  drawnItems.addLayer(e.layer);
-  const lls = e.layer.getLatLngs();
-  const ring = Array.isArray(lls[0]) ? lls[0] : lls;
-  currentPoly = ring.map(ll => [ll.lat, ll.lng]);
-  triggerLayout(currentPoly);
-});
-
-map.on(L.Draw.Event.EDITED, e => {
-  e.layers.eachLayer(layer => {
-    const lls  = layer.getLatLngs();
-    const ring = Array.isArray(lls[0]) ? lls[0] : lls;
-    currentPoly = ring.map(ll => [ll.lat, ll.lng]);
-    triggerLayout(currentPoly);
-  });
-});
-
-map.on(L.Draw.Event.DELETED, () => {
-  currentPoly = null;
-  clearPanels();
-  document.getElementById('layout-results').classList.add('hidden');
-  document.getElementById('sim-results').classList.add('hidden');
+  initApp();
 });
 
 // ═══════════════════════════════════════════════════════
@@ -457,21 +667,6 @@ async function triggerLayout(polygon) {
   } catch (e) { console.error('Layout failed:', e); }
 }
 
-function clearPanels() {
-  panelLayers.forEach(l => map.removeLayer(l));
-  panelLayers = [];
-}
-
-function renderPanels(layout) {
-  clearPanels();
-  layout.panels.forEach(p => {
-    const layer = L.polygon(p.corners, {
-      color: '#00d4ff', fillColor: '#0099bb', fillOpacity: 0.55, weight: 1,
-    }).addTo(map);
-    panelLayers.push(layer);
-  });
-}
-
 function showLayoutSummary(layout) {
   window._layout = layout;
   document.getElementById('layout-results').classList.remove('hidden');
@@ -492,23 +687,23 @@ async function runSimulation() {
   if (!layout || layout.panel_count === 0) { alert('Draw a roof polygon first.'); return; }
   if (!selectedMod) { alert('Select a solar module first.'); return; }
 
-  const total   = layout.panel_count;
-  const pacKw   = selectedInv ? selectedInv.p_ac_max_kw : null;
-  const mppKw   = selectedMod.p_stc_w / 1000.0;
+  const total     = layout.panel_count;
+  const pacKw     = selectedInv ? selectedInv.p_ac_max_kw : null;
+  const mppKw     = selectedMod.p_stc_w / 1000.0;
   const modPerInv = pacKw ? Math.max(1, Math.round(pacKw / mppKw * 1.1)) : total;
   const nInv      = Math.max(1, Math.ceil(total / modPerInv));
   const [lat, lon] = layout.centroid;
 
   const payload = {
-    plant_name:             'Helios-Site-' + Date.now(),
-    latitude_deg:           lat,
-    longitude_deg:          lon,
-    n_inverters:            nInv,
-    n_modules_per_inverter: Math.ceil(total / nInv),
-    module_p_stc_w:         selectedMod.p_stc_w,
+    plant_name:              'Helios-Site-' + Date.now(),
+    latitude_deg:            lat,
+    longitude_deg:           lon,
+    n_inverters:             nInv,
+    n_modules_per_inverter:  Math.ceil(total / nInv),
+    module_p_stc_w:          selectedMod.p_stc_w,
     module_temp_coeff_pct_k: selectedMod.temp_coeff_p_pct_k,
-    module_eta_ref:         selectedMod.eta_ref,
-    dt_seconds:             3600.0,
+    module_eta_ref:          selectedMod.eta_ref,
+    dt_seconds:              3600.0,
   };
 
   const btn = document.getElementById('run-btn');
@@ -547,38 +742,33 @@ function showSimResults(r) {
 // ═══════════════════════════════════════════════════════
 async function searchCatModules() {
   catModOffset = 0;
-  const q = document.getElementById('cat-mod-q').value.trim();
-  const data = await fetchCatModules(q, 0);
+  const data = await fetchCatModules(document.getElementById('cat-mod-q').value.trim(), 0);
   renderCatModList(data, false);
 }
 
 async function loadMoreModules() {
   catModOffset += CAT_PAGE;
-  const q = document.getElementById('cat-mod-q').value.trim();
-  const data = await fetchCatModules(q, catModOffset);
+  const data = await fetchCatModules(document.getElementById('cat-mod-q').value.trim(), catModOffset);
   renderCatModList(data, true);
 }
 
 async function fetchCatModules(q, offset) {
-  const url = `/api/v1/catalog/modules?q=${encodeURIComponent(q)}&limit=${CAT_PAGE}&offset=${offset}`;
-  const resp = await fetch(url);
-  return resp.json();
+  const r = await fetch(`/api/v1/catalog/modules?q=${encodeURIComponent(q)}&limit=${CAT_PAGE}&offset=${offset}`);
+  return r.json();
 }
 
 function renderCatModList(data, append) {
   const list = document.getElementById('cat-mod-list');
   if (!append) list.innerHTML = '';
-
   if (!data.items || data.items.length === 0) {
     if (!append) list.innerHTML = '<div class="cat-empty">No modules found</div>';
     document.getElementById('cat-mod-more').classList.add('hidden');
     return;
   }
-
   data.items.forEach(m => {
     const div = document.createElement('div');
-    div.className = 'cat-item';
-    div.dataset.id = m.id;
+    div.className   = 'cat-item';
+    div.dataset.id  = m.id;
     const eta = (m.eta_ref * 100).toFixed(1);
     div.innerHTML =
       `<div class="ci-name">${m.name}</div>` +
@@ -591,43 +781,27 @@ function renderCatModList(data, append) {
     div.onclick = () => selectCatModule(m, div);
     list.appendChild(div);
   });
-
   const hasMore = data.offset + data.items.length < data.total;
   document.getElementById('cat-mod-more').classList.toggle('hidden', !hasMore);
-  document.getElementById('cat-mod-ver').textContent = `pvlib ${data.pvlib_version}  ·  ${data.total.toLocaleString()} total`;
+  document.getElementById('cat-mod-ver').textContent =
+    `pvlib ${data.pvlib_version}  ·  ${data.total.toLocaleString()} total`;
 }
 
 function selectCatModule(m, el) {
   document.querySelectorAll('#cat-mod-list .cat-item').forEach(x => x.classList.remove('selected'));
   el.classList.add('selected');
-
   selectedMod = {
-    id:                  m.id,
-    manufacturer:        m.name.split(' ')[0],
-    model_name:          m.name,
-    p_stc_w:             m.p_stc_w,
-    width_m:             m.width_m,
-    length_m:            m.length_m,
-    temp_coeff_p_pct_k:  m.temp_coeff_p_pct_k,
-    eta_ref:             m.eta_ref,
+    id: m.id, manufacturer: m.name.split(' ')[0], model_name: m.name,
+    p_stc_w: m.p_stc_w, width_m: m.width_m, length_m: m.length_m,
+    temp_coeff_p_pct_k: m.temp_coeff_p_pct_k, eta_ref: m.eta_ref,
   };
-
-  // Update setup tab display
   document.getElementById('mod-src-tag').textContent = '(catalog)';
   renderModMeta(selectedMod);
-
-  // Update dropdown to show a placeholder for catalog selection
   const sel = document.getElementById('module-select');
-  // Add a temporary option if not already there
   let opt = sel.querySelector('option[value="__cat_selected__"]');
-  if (!opt) {
-    opt = document.createElement('option');
-    opt.value = '__cat_selected__';
-    sel.insertBefore(opt, sel.firstChild);
-  }
+  if (!opt) { opt = document.createElement('option'); opt.value = '__cat_selected__'; sel.insertBefore(opt, sel.firstChild); }
   opt.textContent = `★ ${m.name} — ${m.p_stc_w}W`;
   sel.value = '__cat_selected__';
-
   if (currentPoly) triggerLayout(currentPoly);
   switchTab('setup');
 }
@@ -637,43 +811,37 @@ function selectCatModule(m, el) {
 // ═══════════════════════════════════════════════════════
 async function searchCatInverters() {
   catInvOffset = 0;
-  const q = document.getElementById('cat-inv-q').value.trim();
-  const data = await fetchCatInverters(q, 0);
+  const data = await fetchCatInverters(document.getElementById('cat-inv-q').value.trim(), 0);
   renderCatInvList(data, false);
 }
 
 async function loadMoreInverters() {
   catInvOffset += CAT_PAGE;
-  const q = document.getElementById('cat-inv-q').value.trim();
-  const data = await fetchCatInverters(q, catInvOffset);
+  const data = await fetchCatInverters(document.getElementById('cat-inv-q').value.trim(), catInvOffset);
   renderCatInvList(data, true);
 }
 
 async function fetchCatInverters(q, offset) {
-  const url = `/api/v1/catalog/inverters?q=${encodeURIComponent(q)}&limit=${CAT_PAGE}&offset=${offset}`;
-  const resp = await fetch(url);
-  return resp.json();
+  const r = await fetch(`/api/v1/catalog/inverters?q=${encodeURIComponent(q)}&limit=${CAT_PAGE}&offset=${offset}`);
+  return r.json();
 }
 
 function renderCatInvList(data, append) {
   const list = document.getElementById('cat-inv-list');
   if (!append) list.innerHTML = '';
-
   if (!data.items || data.items.length === 0) {
     if (!append) list.innerHTML = '<div class="cat-empty">No inverters found</div>';
     document.getElementById('cat-inv-more').classList.add('hidden');
     return;
   }
-
   data.items.forEach(inv => {
     const div = document.createElement('div');
-    div.className = 'cat-item';
+    div.className  = 'cat-item';
     div.dataset.id = inv.id;
-    const kw    = (inv.p_ac_max_w / 1000).toFixed(1);
-    const eta   = (inv.eta_max * 100).toFixed(1);
-    const vmax  = inv.v_dc_max_v ? `${inv.v_dc_max_v}V max` : '';
-    const mppt  = (inv.mppt_low_v && inv.mppt_high_v)
-      ? `MPPT ${inv.mppt_low_v}–${inv.mppt_high_v}V` : '';
+    const kw   = (inv.p_ac_max_w / 1000).toFixed(1);
+    const eta  = (inv.eta_max * 100).toFixed(1);
+    const vmax = inv.v_dc_max_v ? `${inv.v_dc_max_v}V max` : '';
+    const mppt = (inv.mppt_low_v && inv.mppt_high_v) ? `MPPT ${inv.mppt_low_v}–${inv.mppt_high_v}V` : '';
     div.innerHTML =
       `<div class="ci-name">${inv.manufacturer ? inv.manufacturer + ' — ' : ''}${inv.model}</div>` +
       `<div class="ci-meta">` +
@@ -684,84 +852,37 @@ function renderCatInvList(data, append) {
     div.onclick = () => selectCatInverter(inv, div);
     list.appendChild(div);
   });
-
   const hasMore = data.offset + data.items.length < data.total;
   document.getElementById('cat-inv-more').classList.toggle('hidden', !hasMore);
-  document.getElementById('cat-inv-ver').textContent = `pvlib ${data.pvlib_version}  ·  ${data.total.toLocaleString()} total`;
+  document.getElementById('cat-inv-ver').textContent =
+    `pvlib ${data.pvlib_version}  ·  ${data.total.toLocaleString()} total`;
 }
 
 function selectCatInverter(inv, el) {
   document.querySelectorAll('#cat-inv-list .cat-item').forEach(x => x.classList.remove('selected'));
   el.classList.add('selected');
-
   selectedInv = {
-    id:          inv.id,
-    p_ac_max_kw: inv.p_ac_max_w / 1000,
-    p_dc_max_kw: inv.p_dc_max_w / 1000,
-    eta_max:     inv.eta_max,
+    id: inv.id, p_ac_max_kw: inv.p_ac_max_w / 1000,
+    p_dc_max_kw: inv.p_dc_max_w / 1000, eta_max: inv.eta_max,
   };
-
   document.getElementById('inv-src-tag').textContent = '(catalog)';
   document.getElementById('inv-meta').textContent =
     `${(inv.p_ac_max_w/1000).toFixed(1)} kW AC  ·  η ${(inv.eta_max*100).toFixed(1)}%`;
-
-  // Update dropdown
   const sel = document.getElementById('inverter-select');
   let opt = sel.querySelector('option[value="__cat_inv_selected__"]');
-  if (!opt) {
-    opt = document.createElement('option');
-    opt.value = '__cat_inv_selected__';
-    sel.insertBefore(opt, sel.firstChild);
-  }
+  if (!opt) { opt = document.createElement('option'); opt.value = '__cat_inv_selected__'; sel.insertBefore(opt, sel.firstChild); }
   opt.textContent = `★ ${inv.manufacturer ? inv.manufacturer + ' ' : ''}${inv.model} — ${(inv.p_ac_max_w/1000).toFixed(0)}kW`;
   sel.value = '__cat_inv_selected__';
-
   switchTab('setup');
 }
 
 // ═══════════════════════════════════════════════════════
-//  Location search (Nominatim)
-// ═══════════════════════════════════════════════════════
-async function searchLocation() {
-  const q = document.getElementById('search-input').value.trim();
-  if (!q) return;
-  try {
-    const resp = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1`,
-      { headers: { 'Accept-Language': 'en' } }
-    );
-    const data = await resp.json();
-    if (data.length > 0) {
-      const lat = parseFloat(data[0].lat);
-      const lon = parseFloat(data[0].lon);
-      map.setView([lat, lon], 19);
-      // Drop a location pin
-      if (coordMarker) map.removeLayer(coordMarker);
-      coordMarker = L.marker([lat, lon])
-        .addTo(map)
-        .bindPopup(`📍 ${lat.toFixed(6)}, ${lon.toFixed(6)}<br><small>${data[0].display_name}</small>`)
-        .openPopup();
-    } else {
-      alert('Location not found. Try a more specific address.');
-    }
-  } catch (e) { alert('Search error: ' + e.message); }
-}
-
-// ═══════════════════════════════════════════════════════
-//  Debounce utility
+//  Utilities
 // ═══════════════════════════════════════════════════════
 function debounce(fn, ms) {
   let timer;
-  return function(...args) {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn.apply(this, args), ms);
-  };
+  return function(...args) { clearTimeout(timer); timer = setTimeout(() => fn.apply(this, args), ms); };
 }
-
-// ═══════════════════════════════════════════════════════
-//  Boot
-// ═══════════════════════════════════════════════════════
-loadSeeds();
 </script>
 </body>
 </html>
